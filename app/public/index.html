@@ -1,0 +1,740 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-theme="modern">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Shopping" data-i18n-content="appShort">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <script>
+    // Apply the saved theme, display mode and language before first paint
+    try {
+      const lang = localStorage.getItem('lang');
+      if (lang === 'he') { document.documentElement.lang = 'he'; document.documentElement.dir = 'rtl'; }
+      const t = localStorage.getItem('theme');
+      const v = t === 'wa' ? 'washi' : t;
+      if (['modern', 'washi', 'konbini', 'shire'].includes(v)) document.documentElement.dataset.theme = v;
+      const m = localStorage.getItem('mode');
+      if (m === 'dark' || m === 'light') document.documentElement.dataset.mode = m;
+    } catch {}
+  </script>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="stylesheet" href="/fonts/noto-sans-hebrew/hebrew-400.css">
+  <link rel="stylesheet" href="/fonts/noto-sans-hebrew/latin-400.css">
+  <link rel="stylesheet" href="/fonts/noto-sans-hebrew/hebrew-500.css">
+  <link rel="stylesheet" href="/fonts/noto-sans-hebrew/latin-500.css">
+  <link rel="stylesheet" href="/fonts/noto-sans-hebrew/hebrew-700.css">
+  <link rel="stylesheet" href="/fonts/noto-sans-hebrew/latin-700.css">
+  <link rel="stylesheet" href="/fonts/varela-round/hebrew-400.css">
+  <link rel="stylesheet" href="/fonts/varela-round/latin-400.css">
+  <link rel="stylesheet" href="/fonts/secular-one/hebrew-400.css">
+  <link rel="stylesheet" href="/fonts/secular-one/latin-400.css">
+  <link rel="stylesheet" href="/fonts/heebo/hebrew-400.css">
+  <link rel="stylesheet" href="/fonts/heebo/latin-400.css">
+  <link rel="stylesheet" href="/fonts/heebo/hebrew-500.css">
+  <link rel="stylesheet" href="/fonts/heebo/latin-500.css">
+  <link rel="stylesheet" href="/fonts/heebo/hebrew-700.css">
+  <link rel="stylesheet" href="/fonts/heebo/latin-700.css">
+  <link rel="stylesheet" href="/fonts/suez-one/hebrew-400.css">
+  <link rel="stylesheet" href="/fonts/suez-one/latin-400.css">
+  <link rel="stylesheet" href="/fonts/rubik/hebrew-400.css">
+  <link rel="stylesheet" href="/fonts/rubik/latin-400.css">
+  <link rel="stylesheet" href="/fonts/rubik/hebrew-500.css">
+  <link rel="stylesheet" href="/fonts/rubik/latin-500.css">
+  <link rel="stylesheet" href="/fonts/rubik/hebrew-600.css">
+  <link rel="stylesheet" href="/fonts/rubik/latin-600.css">
+  <link rel="stylesheet" href="style.css">
+  <title data-i18n="appTitle">Shopping List</title>
+</head>
+<body>
+  <svg class="sprite" aria-hidden="true">
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c1.2-3.6 3.9-5.5 7-5.5s5.8 1.9 7 5.5"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M4 6.5h16M4 12h16M4 17.5h10"/></symbol>
+    <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M6 3.5h12v17l-3-1.8-3 1.8-3-1.8-3 1.8z"/><path d="M9 8.5h6M9 12h6M9 15.5h3"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20h16M7.5 20v-8M12 20V5M16.5 20v-5"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3.5L9 5.5h6L16.5 8H20v11H4z"/><circle cx="12" cy="13.2" r="3.3"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><circle cx="9" cy="9.5" r="1.4"/><path d="M4 16.5l4.5-4.5 4 4 2.5-2.5 5 5"/></symbol>
+    <symbol id="i-chev-r" viewBox="0 0 24 24"><path d="M9.5 6l6 6-6 6"/></symbol>
+    <symbol id="i-chev-l" viewBox="0 0 24 24"><path d="M14.5 6l-6 6 6 6"/></symbol>
+    <symbol id="i-cart" viewBox="0 0 24 24"><path d="M3 4.5h2.5l2.2 10.5h10.1l2-7.5H6.6"/><circle cx="9.5" cy="19" r="1.3"/><circle cx="16.5" cy="19" r="1.3"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.2" class="fill"/><circle cx="12" cy="12" r="1.2" class="fill"/><circle cx="18" cy="12" r="1.2" class="fill"/></symbol>
+    <symbol id="i-cloud-off" viewBox="0 0 24 24"><path d="M7 18h10.5a3.5 3.5 0 0 0 .6-6.95A5.5 5.5 0 0 0 7.6 9.1 4.5 4.5 0 0 0 7 18z"/><path d="M4 4l16 16"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M5 4.5h11.5a2 2 0 0 1 2 2v13H7a2 2 0 0 1-2-2z"/><path d="M5 17.5a2 2 0 0 1 2-2h11.5"/><path d="M9 8.5h6"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></symbol>
+    <symbol id="i-import" viewBox="0 0 24 24"><path d="M6 3.5h9l3 3v14H6z"/><path d="M9 9.5h6M9 13h6M9 16.5h4"/></symbol>
+    <symbol id="i-pen" viewBox="0 0 24 24"><path d="M15.5 5.5l3 3L9 18l-4 1 1-4z"/><path d="M13.5 7.5l3 3"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2.05-4.95"/><path d="M19 4.5V8h-3.5"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M19.5 14.6A7.8 7.8 0 0 1 9.4 4.5a7.8 7.8 0 1 0 10.1 10.1z"/></symbol>
+    <symbol id="i-auto" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" class="fill"/></symbol>
+    <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 17.5V5.5l10-2v12"/><circle cx="6.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="15.5" r="2.5"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z"/></symbol>
+    <symbol id="i-shuffle" viewBox="0 0 24 24"><path d="M3.5 7h3.5c4 0 6 10 10 10h3.5M3.5 17h3.5c1.6 0 2.8-1.6 3.9-3.6M13.1 9.6C14.2 7.6 15.4 7 17 7h3.5"/><path d="M18 4.5L20.5 7 18 9.5M18 14.5l2.5 2.5-2.5 2.5"/></symbol>
+    <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3.5l1.9 5.6 5.6 1.9-5.6 1.9L12 18.5l-1.9-5.6L4.5 11l5.6-1.9z"/><path d="M18.5 16.5l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 15V4M8 7.5L12 3.5l4 4"/><path d="M6 11H5v9.5h14V11h-1"/></symbol>
+  </svg>
+
+  <header class="topbar">
+    <h1><span class="title-long" data-i18n="appTitle">Shopping List</span><span class="title-short" data-i18n="appShort">Shopping</span></h1>
+    <div class="topbar-tools">
+      <button id="mode-toggle" class="icon-btn mode-toggle" type="button"><svg class="icon"><use href="#i-auto"/></svg></button>
+      <button id="settings-open" class="theme-toggle" type="button" data-i18n="settings">Settings</button>
+      <button id="who" class="who" type="button" aria-label="Switch user" data-i18n-aria-label="switchUser">
+        <svg class="icon"><use href="#i-user"/></svg>
+        <span id="who-name"></span>
+      </button>
+    </div>
+  </header>
+
+  <div id="net-banner" class="net-banner" role="status" hidden>
+    <svg class="icon"><use href="#i-cloud-off"/></svg>
+    <span id="net-text"></span>
+  </div>
+
+  <main>
+    <!-- Shopping list -->
+    <section id="view-list" class="view active" aria-labelledby="list-title">
+      <nav id="list-tabs" class="list-tabs" aria-label="Lists" data-i18n-aria-label="lists"></nav>
+
+      <form id="add-form" class="add-form" autocomplete="off">
+        <div class="add-wrap">
+          <input id="add-name" type="text" placeholder="What do you need?" data-i18n-placeholder="addPlaceholder" enterkeyhint="done" aria-label="New item" data-i18n-aria-label="newItem"
+                 role="combobox" aria-autocomplete="list" aria-controls="suggest" aria-expanded="false" required>
+          <ul id="suggest" class="suggest" role="listbox" hidden></ul>
+        </div>
+        <button type="submit" class="icon-btn add-btn" aria-label="Add" data-i18n-aria-label="add">
+          <svg class="icon"><use href="#i-plus"/></svg>
+        </button>
+      </form>
+      <button id="open-import" class="link-btn import-link" type="button">
+        <svg class="icon"><use href="#i-import"/></svg><span data-i18n="importLink">Import from a note, recipe or text</span>
+      </button>
+
+      <div class="list-head">
+        <h2 id="list-title" data-i18n="toBuy">To buy</h2>
+        <span id="list-count" class="count"></span>
+        <button id="store-toggle" class="btn store-toggle" type="button" aria-pressed="false">
+          <svg class="icon"><use href="#i-cart"/></svg><span id="store-toggle-label" data-i18n="inStoreButton">In store</span>
+        </button>
+      </div>
+      <p class="hint" id="list-hint"></p>
+      <div id="store-song" class="store-song" hidden>
+        <svg class="icon store-song-icon"><use href="#i-music"/></svg>
+        <div class="store-song-text">
+          <span class="store-song-kicker" data-i18n="songKicker">A song for the store</span>
+          <strong id="store-song-title" class="store-song-title"></strong>
+          <span id="store-song-why" class="store-song-why"></span>
+        </div>
+        <a id="store-song-play" class="icon-btn store-song-play" target="_blank" rel="noopener noreferrer" aria-label="Find the song on YouTube" data-i18n-aria-label="songSearch"><svg class="icon"><use href="#i-play"/></svg></a>
+        <button id="store-song-next" class="icon-btn" type="button" aria-label="Another song" data-i18n-aria-label="songNext"><svg class="icon"><use href="#i-shuffle"/></svg></button>
+      </div>
+      <div id="items" class="items-wrap"></div>
+      <div id="items-empty" class="empty" hidden>
+        <svg class="icon empty-icon"><use href="#i-cart"/></svg>
+        <p data-i18n="listEmpty">The list is empty. Add something you need.</p>
+      </div>
+      <div class="action-bar">
+        <button id="open-purchase" class="btn primary big main-action" type="button">Record purchase</button>
+      </div>
+    </section>
+
+    <!-- Saved recipes and recurring batches -->
+    <section id="view-saved" class="view" aria-labelledby="saved-title">
+      <div class="view-head">
+        <h2 id="saved-title" class="view-title" data-i18n="tabSaved">Saved</h2>
+        <button id="new-saved" class="btn" type="button"><svg class="icon"><use href="#i-plus"/></svg><span data-i18n="new">New</span></button>
+      </div>
+      <p class="hint" data-i18n="savedHint">Recipes and regular shops. Pick one and add what you need to the list.</p>
+      <div id="saved-list"></div>
+      <div id="saved-empty" class="empty" hidden>
+        <svg class="icon empty-icon"><use href="#i-book"/></svg>
+        <p data-i18n="savedEmpty">Nothing here yet. Save a recipe from a link or a note, or create a regular shop.</p>
+        <button id="saved-empty-import" class="link-btn" type="button"><svg class="icon"><use href="#i-import"/></svg><span data-i18n="savedEmptyImport">Save a recipe from a link or note</span></button>
+      </div>
+    </section>
+
+    <!-- Purchase history -->
+    <section id="view-history" class="view" aria-labelledby="history-title">
+      <div class="view-head">
+        <h2 id="history-title" class="view-title" data-i18n="tabPurchases">Purchases</h2>
+        <button id="new-purchase" class="btn" type="button"><svg class="icon"><use href="#i-plus"/></svg><span data-i18n="newPurchase">New purchase</span></button>
+      </div>
+      <label class="search">
+        <svg class="icon"><use href="#i-search"/></svg>
+        <input id="search" type="search" placeholder="Search store or item" data-i18n-placeholder="searchPlaceholder" aria-label="Search purchases" data-i18n-aria-label="searchPurchases" enterkeyhint="search">
+      </label>
+      <ul id="purchases" class="purchases"></ul>
+      <div id="purchases-empty" class="empty" hidden>
+        <svg class="icon empty-icon"><use href="#i-receipt"/></svg>
+        <p id="purchases-empty-text" data-i18n="purchasesEmpty">No purchases recorded yet.</p>
+      </div>
+    </section>
+
+    <!-- Summary -->
+    <section id="view-summary" class="view" aria-labelledby="month-label">
+      <div class="view-head">
+        <h2 id="balance-title" class="view-title" data-i18n="balanceTitle">Balance</h2>
+        <button id="open-settle" class="btn" type="button"><svg class="icon"><use href="#i-plus"/></svg><span data-i18n="settleUp">Settle up</span></button>
+      </div>
+      <div id="balance" class="summary balance"></div>
+      <details id="settlements" class="lines settlements" hidden>
+        <summary id="settlements-summary"></summary>
+        <ul id="settlements-list" class="line-list"></ul>
+      </details>
+
+      <div class="month-nav">
+        <button id="month-prev" class="icon-btn" type="button" aria-label="Previous month" data-i18n-aria-label="prevMonth"><svg class="icon flip-rtl"><use href="#i-chev-l"/></svg></button>
+        <h2 id="month-label"></h2>
+        <button id="month-next" class="icon-btn" type="button" aria-label="Next month" data-i18n-aria-label="nextMonth"><svg class="icon flip-rtl"><use href="#i-chev-r"/></svg></button>
+      </div>
+      <div id="month-summary" class="summary"></div>
+
+      <h3 class="section-title" data-i18n="sixMonths">Six months</h3>
+      <div id="trend" class="chart-panel"></div>
+
+      <h3 class="section-title" data-i18n="byCategory">By category</h3>
+      <div id="by-category" class="chart-panel"></div>
+
+      <h3 class="section-title" data-i18n="byStore">By store</h3>
+      <div id="by-store" class="chart-panel"></div>
+
+      <h3 class="section-title" data-i18n="allTime">All time</h3>
+      <div id="all-summary" class="summary"></div>
+
+      <a class="btn export-btn" href="/api/export.csv" download>
+        <svg class="icon"><use href="#i-download"/></svg><span data-i18n="exportCsv">Export all purchases (CSV)</span>
+      </a>
+    </section>
+  </main>
+
+  <nav class="tabs" aria-label="Navigation" data-i18n-aria-label="navigation">
+    <button class="tab active" data-view="list" type="button"><svg class="icon"><use href="#i-list"/></svg><span data-i18n="tabList">List</span></button>
+    <button class="tab" data-view="saved" type="button"><svg class="icon"><use href="#i-book"/></svg><span data-i18n="tabSaved">Saved</span></button>
+    <button class="tab" data-view="history" type="button"><svg class="icon"><use href="#i-receipt"/></svg><span data-i18n="tabPurchases">Purchases</span></button>
+    <button class="tab" data-view="summary" type="button"><svg class="icon"><use href="#i-chart"/></svg><span data-i18n="tabSummary">Summary</span></button>
+  </nav>
+
+  <!-- Who are you? -->
+  <div id="who-modal" class="modal" hidden>
+    <div class="sheet small" role="dialog" aria-modal="true" aria-labelledby="who-title">
+      <h2 id="who-title" data-i18n="whoTitle">Who is using this phone?</h2>
+      <div id="people-buttons" class="people-buttons"></div>
+      <form id="person-form" class="add-form" autocomplete="off">
+        <input id="person-name" type="text" placeholder="New name" data-i18n-placeholder="newName" aria-label="New name" data-i18n-aria-label="newName" required>
+        <button type="submit" class="btn primary" data-i18n="add">Add</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Settings: theme (per phone), household language, currency, people, OpenAI -->
+  <div id="settings-modal" class="modal" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div class="sheet-head">
+        <h2 id="settings-title" data-i18n="settings">Settings</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Close" data-i18n-aria-label="close"><svg class="icon"><use href="#i-x"/></svg></button>
+      </div>
+
+      <section class="settings-group">
+        <h3 id="theme-title" class="settings-title" data-i18n="appearance">Appearance</h3>
+        <div id="theme-options" class="theme-options" role="radiogroup" aria-labelledby="theme-title"></div>
+      </section>
+
+      <section class="settings-group">
+        <div class="field-row">
+          <label class="field">
+            <span data-i18n="language">Language</span>
+            <select id="set-language"></select>
+          </label>
+          <label class="field">
+            <span data-i18n="currency">Currency</span>
+            <select id="set-currency"></select>
+          </label>
+        </div>
+      </section>
+
+      <section class="settings-group">
+        <h3 class="settings-title" data-i18n="household">Household</h3>
+        <p class="hint" data-i18n="householdHint">Everyone who shops. Each phone picks who it belongs to.</p>
+        <ul id="set-people" class="ing-rows"></ul>
+        <form id="set-person-form" class="add-form" autocomplete="off">
+          <input id="set-person-name" type="text" placeholder="Name" data-i18n-placeholder="personName" aria-label="Add person" data-i18n-aria-label="addPerson" required>
+          <button type="submit" class="btn" data-i18n="add">Add</button>
+        </form>
+      </section>
+
+      <section class="settings-group">
+        <h3 class="settings-title" data-i18n="ai">Receipt and note reading (OpenAI)</h3>
+        <p class="hint" data-i18n="aiHint">Optional.</p>
+        <p id="set-key-status" class="key-status"></p>
+        <div id="set-key-edit" class="key-edit">
+          <label class="field">
+            <span data-i18n="apiKey">OpenAI API key</span>
+            <input id="set-key" type="password" autocomplete="off" spellcheck="false" dir="ltr" placeholder="sk-…" data-i18n-placeholder="apiKeyPlaceholder">
+          </label>
+          <p class="hint" data-i18n="aiGetKey">Get a key at platform.openai.com/api-keys.</p>
+          <div class="button-row">
+            <button id="set-key-test" type="button" class="btn" data-i18n="testKey">Test</button>
+            <button id="set-key-save" type="button" class="btn primary" data-i18n="saveKey">Save key</button>
+          </div>
+          <button id="set-key-remove" type="button" class="link-btn danger" data-i18n="removeKey" hidden>Remove key</button>
+        </div>
+        <div id="set-key-msg" class="status" role="status" hidden></div>
+        <div class="field-row">
+          <label class="field">
+            <span data-i18n="modelBasic">Basic reading model</span>
+            <input id="set-model" type="text" dir="ltr" spellcheck="false" autocomplete="off">
+          </label>
+          <label class="field">
+            <span data-i18n="modelStrong">Careful reading model</span>
+            <input id="set-model-strong" type="text" dir="ltr" spellcheck="false" autocomplete="off">
+          </label>
+        </div>
+        <p class="hint" data-i18n="modelsHint">Any OpenAI model that accepts images.</p>
+      </section>
+
+      <p class="hint settings-note" data-i18n="settingsOpenNote"></p>
+    </div>
+  </div>
+
+  <!-- First run: language, currency, people, OpenAI key -->
+  <div id="setup-modal" class="modal setup-modal" hidden>
+    <form id="setup-form" class="sheet setup-sheet" role="dialog" aria-modal="true" aria-labelledby="setup-title" autocomplete="off" novalidate>
+      <p id="setup-step-label" class="setup-step-label"></p>
+      <h2 id="setup-title"></h2>
+
+      <div class="setup-step" data-step="1">
+        <p class="setup-lead" data-i18n="setupIntro"></p>
+        <div class="segmented setup-lang" role="radiogroup" aria-label="Language" data-i18n-aria-label="language">
+          <label><input type="radio" name="setup-lang" value="en" checked><span>English</span></label>
+          <label><input type="radio" name="setup-lang" value="he"><span>עברית</span></label>
+        </div>
+        <label class="field">
+          <span data-i18n="currency">Currency</span>
+          <select id="setup-currency"></select>
+        </label>
+      </div>
+
+      <div class="setup-step" data-step="2" hidden>
+        <p class="hint" data-i18n="setupPeopleHint"></p>
+        <ul id="setup-people" class="ing-rows"></ul>
+        <button id="setup-add-person" type="button" class="link-btn"><svg class="icon"><use href="#i-plus"/></svg><span data-i18n="addPerson">Add person</span></button>
+      </div>
+
+      <div class="setup-step" data-step="3" hidden>
+        <p class="hint" data-i18n="aiHint"></p>
+        <div id="setup-key-wrap" class="key-edit">
+          <label class="field">
+            <span data-i18n="apiKey">OpenAI API key</span>
+            <input id="setup-key" type="password" autocomplete="off" spellcheck="false" dir="ltr" placeholder="sk-…" data-i18n-placeholder="apiKeyPlaceholder">
+          </label>
+          <p class="hint" data-i18n="aiGetKey"></p>
+          <button id="setup-key-test" type="button" class="btn" data-i18n="testKey">Test</button>
+        </div>
+        <p id="setup-key-env" class="key-status" data-i18n="keyFromEnv" hidden></p>
+        <div id="setup-key-msg" class="status" role="status" hidden></div>
+        <p class="hint" data-i18n="setupSkipAi"></p>
+      </div>
+
+      <div id="setup-error" class="status warn" role="alert" hidden></div>
+      <div class="setup-actions">
+        <button id="setup-back" type="button" class="btn" data-i18n="back">Back</button>
+        <button id="setup-next" type="submit" class="btn primary big">Next</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Edit one list item -->
+  <div id="item-modal" class="modal" hidden>
+    <form id="item-form" class="sheet" autocomplete="off" role="dialog" aria-modal="true" aria-labelledby="item-title">
+      <div class="sheet-head">
+        <h2 id="item-title" data-i18n="editItem">Edit item</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Close" data-i18n-aria-label="close"><svg class="icon"><use href="#i-x"/></svg></button>
+      </div>
+      <label class="field">
+        <span data-i18n="name">Name</span>
+        <input id="i-name" type="text" required>
+      </label>
+      <div class="field-row">
+        <div class="field">
+          <span data-i18n="quantity">Quantity</span>
+          <div class="stepper">
+            <button type="button" class="icon-btn" data-step="1" aria-label="One more" data-i18n-aria-label="oneMore"><svg class="icon"><use href="#i-plus"/></svg></button>
+            <output id="i-qty" class="num">1</output>
+            <button type="button" class="icon-btn" data-step="-1" aria-label="One less" data-i18n-aria-label="oneLess"><svg class="icon"><use href="#i-minus"/></svg></button>
+          </div>
+        </div>
+        <label class="field">
+          <span data-i18n="storeSection">Store section</span>
+          <select id="i-section"></select>
+        </label>
+      </div>
+      <div class="field-row">
+        <label id="i-list-field" class="field">
+          <span data-i18n="tabList">List</span>
+          <select id="i-list-pick"></select>
+        </label>
+        <label class="field">
+          <span data-i18n="note">Note</span>
+          <input id="i-note" type="text" placeholder="Optional" data-i18n-placeholder="optional">
+        </label>
+      </div>
+      <div id="i-prices" class="field" hidden>
+        <span data-i18n="pastPrices">Past prices</span>
+        <ul id="i-prices-list" class="price-list"></ul>
+      </div>
+      <div class="sheet-actions">
+        <button type="button" id="i-delete" class="btn" data-i18n="delete">Delete</button>
+        <button type="submit" class="btn primary big" data-i18n="save">Save</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Manage a list -->
+  <div id="list-modal" class="modal" hidden>
+    <form id="list-form" class="sheet small" autocomplete="off" role="dialog" aria-modal="true" aria-labelledby="list-modal-title">
+      <h2 id="list-modal-title" data-i18n="tabList">List</h2>
+      <label class="field">
+        <span data-i18n="listName">List name</span>
+        <input id="l-name" type="text" required>
+      </label>
+      <div class="sheet-actions">
+        <button type="button" id="l-delete" class="btn" data-i18n="deleteList">Delete list</button>
+        <button type="button" class="btn" data-close data-i18n="cancel">Cancel</button>
+        <button type="submit" class="btn primary" data-i18n="save">Save</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Settle up by hand -->
+  <div id="settle-modal" class="modal" hidden>
+    <form id="settle-form" class="sheet small" autocomplete="off" role="dialog" aria-modal="true" aria-labelledby="settle-title">
+      <div class="sheet-head">
+        <h2 id="settle-title" data-i18n="settleUp">Settle up</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Close" data-i18n-aria-label="close"><svg class="icon"><use href="#i-x"/></svg></button>
+      </div>
+      <div class="segmented" role="radiogroup" aria-label="Kind of settlement" data-i18n-aria-label="settleKindAria">
+        <label><input type="radio" name="settle-kind" value="transfer" checked><span data-i18n="settleTransfer">Money sent</span></label>
+        <label><input type="radio" name="settle-kind" value="expense"><span data-i18n="settleExpense">Bill paid</span></label>
+      </div>
+      <p id="settle-kind-hint" class="read-hint"></p>
+      <div class="field-row">
+        <label class="field">
+          <span id="settle-payer-label">Who sent it</span>
+          <select id="settle-payer"></select>
+        </label>
+        <label id="settle-receiver-field" class="field">
+          <span data-i18n="settleTo">To whom</span>
+          <select id="settle-receiver"></select>
+        </label>
+      </div>
+      <div class="field-row">
+        <label class="field">
+          <span id="settle-amount-label">Amount</span>
+          <input id="settle-amount" type="text" inputmode="decimal" placeholder="0.00" required>
+        </label>
+        <label class="field">
+          <span data-i18n="date">Date</span>
+          <input id="settle-date" type="date">
+        </label>
+      </div>
+      <label class="field">
+        <span data-i18n="settleWhatFor">What for</span>
+        <input id="settle-note" type="text">
+      </label>
+      <p id="settle-preview" class="status" hidden></p>
+      <div class="sheet-actions">
+        <button type="button" class="btn" data-close data-i18n="cancel">Cancel</button>
+        <button id="settle-save" type="submit" class="btn primary big" data-i18n="save">Save</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Record or edit a purchase -->
+  <div id="purchase-modal" class="modal" hidden>
+    <form id="purchase-form" class="sheet" autocomplete="off" role="dialog" aria-modal="true" aria-labelledby="purchase-title">
+      <div class="sheet-head">
+        <h2 id="purchase-title" data-i18n="recordPurchase">Record purchase</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Close" data-i18n-aria-label="close"><svg class="icon"><use href="#i-x"/></svg></button>
+      </div>
+
+      <div id="receipt-box" class="receipt-box">
+        <div id="photo-kind" class="segmented" role="radiogroup" aria-label="What's in the photo" data-i18n-aria-label="photoKindAria">
+          <label><input type="radio" name="photo-kind" value="receipt" checked><span data-i18n="kindReceipt">Receipt</span></label>
+          <label><input type="radio" name="photo-kind" value="products"><span data-i18n="kindProducts">The products</span></label>
+        </div>
+        <div class="receipt-buttons">
+          <button id="photo-camera" type="button" class="btn primary">
+            <svg class="icon"><use href="#i-camera"/></svg>
+            <span id="photo-camera-label" data-i18n="takeReceipt">Photograph receipt</span>
+          </button>
+          <label class="btn">
+            <svg class="icon"><use href="#i-image"/></svg>
+            <span data-i18n="fromGallery">From gallery</span>
+            <input id="photo-gallery" type="file" accept="image/*" hidden>
+          </label>
+        </div>
+        <img id="receipt-preview" class="receipt-preview" alt="The receipt photo" data-i18n-alt="receiptPhotoAlt" hidden>
+        <div id="receipt-read" class="read-box" hidden>
+          <div class="segmented" role="radiogroup" aria-label="Reading type" data-i18n-aria-label="readType">
+            <label><input type="radio" name="receipt-read-model" value="basic" checked><span data-i18n="readBasic">Basic reading</span></label>
+            <label><input type="radio" name="receipt-read-model" value="strong"><span data-i18n="readStrong">Careful reading</span></label>
+          </div>
+          <p id="receipt-read-hint" class="read-hint" data-i18n="readHintReceipt">Careful: for faded, crumpled or unclear receipts. Slower.</p>
+          <button id="receipt-read-go" type="button" class="btn primary" data-i18n="readReceipt">Read receipt (ChatGPT)</button>
+          <button id="receipt-read-cancel" type="button" class="btn" hidden data-i18n="cancelReading">Cancel reading</button>
+        </div>
+        <div id="receipt-status" class="status" role="status" hidden></div>
+      </div>
+
+      <div class="field-row">
+        <label class="field">
+          <span id="p-total-label">Amount paid</span>
+          <input id="p-total" type="text" inputmode="decimal" placeholder="0.00" required>
+        </label>
+        <label class="field">
+          <span data-i18n="paidBy">Paid by</span>
+          <select id="p-buyer"></select>
+        </label>
+      </div>
+      <div class="field-row">
+        <label class="field">
+          <span data-i18n="store">Store</span>
+          <input id="p-store" type="text" placeholder="Optional" data-i18n-placeholder="optional">
+        </label>
+        <label class="field">
+          <span data-i18n="date">Date</span>
+          <input id="p-date" type="date">
+        </label>
+      </div>
+      <label class="field">
+        <span data-i18n="category">Category</span>
+        <select id="p-category"></select>
+      </label>
+
+      <div id="p-items-field" class="field">
+        <span data-i18n="boughtFromList">What was bought from the list</span>
+        <p id="p-items-hint" class="status" hidden></p>
+        <div id="p-items" class="pick-groups"></div>
+        <p id="p-items-empty" class="hint" hidden data-i18n="noListItems">No items on the list.</p>
+      </div>
+
+      <details id="p-lines" class="lines" hidden>
+        <summary id="p-lines-summary"></summary>
+        <ul id="p-lines-list" class="line-list"></ul>
+        <div id="p-line-add" class="line-add" hidden>
+          <input id="p-line-add-name" type="text" placeholder="A product that was missed" data-i18n-placeholder="addProductPlaceholder" aria-label="Add a product" data-i18n-aria-label="addProductAria" enterkeyhint="done">
+          <button id="p-line-add-go" type="button" class="btn" data-i18n="add">Add</button>
+        </div>
+      </details>
+
+      <label class="field">
+        <span data-i18n="notes">Notes</span>
+        <textarea id="p-note" rows="2" placeholder="Optional" data-i18n-placeholder="optional"></textarea>
+      </label>
+
+      <label id="p-monster-line" class="check-line monster-line">
+        <input id="p-monster" type="checkbox" class="tick small">
+        <span><span data-i18n="monsterCheck">Make a monster out of what we bought</span> <span class="read-hint" data-i18n="monsterCost">(about 5 US cents, or do it later)</span></span>
+      </label>
+
+      <div class="sheet-actions">
+        <button type="button" class="btn" data-close data-i18n="cancel">Cancel</button>
+        <button id="p-save" type="submit" class="btn primary big" data-i18n="save">Save</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- One saved recipe or batch: choose what to merge into the list -->
+  <div id="saved-modal" class="modal" hidden>
+    <form id="saved-form" class="sheet" autocomplete="off" role="dialog" aria-modal="true" aria-labelledby="saved-name">
+      <div class="sheet-head">
+        <h2 id="saved-name"></h2>
+        <button type="button" class="icon-btn" data-close aria-label="Close" data-i18n-aria-label="close"><svg class="icon"><use href="#i-x"/></svg></button>
+      </div>
+      <div class="saved-meta">
+        <a id="saved-source" class="link-btn" target="_blank" rel="noopener noreferrer" hidden><svg class="icon"><use href="#i-link"/></svg><span data-i18n="originalRecipe">Original recipe</span></a>
+        <div id="saved-servings-field" class="servings" hidden>
+          <span data-i18n="servings">Servings</span>
+          <div class="stepper">
+            <button type="button" class="icon-btn" data-serve="1" aria-label="One more serving" data-i18n-aria-label="oneMoreServing"><svg class="icon"><use href="#i-plus"/></svg></button>
+            <output id="saved-servings" class="num">4</output>
+            <button type="button" class="icon-btn" data-serve="-1" aria-label="One less serving" data-i18n-aria-label="oneLessServing"><svg class="icon"><use href="#i-minus"/></svg></button>
+          </div>
+        </div>
+      </div>
+      <p id="saved-notes" class="saved-notes" hidden></p>
+      <div class="field">
+        <span id="saved-count" data-i18n="whatToAdd">What to add</span>
+        <p id="saved-hint" class="hint" hidden data-i18n="skippedHint">Items already on the list, or usually at home, aren't ticked.</p>
+        <ul id="saved-items" class="pick-items"></ul>
+      </div>
+      <div class="saved-tools">
+        <button id="saved-edit" type="button" class="link-btn" data-i18n="edit">Edit</button>
+        <button id="saved-delete" type="button" class="link-btn danger" data-i18n="delete">Delete</button>
+      </div>
+      <div class="sheet-actions">
+        <button type="button" class="btn" data-close data-i18n="close">Close</button>
+        <button id="saved-merge" type="submit" class="btn primary big" data-i18n="addToList">Add to list</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Create or edit a saved recipe or batch -->
+  <div id="saved-edit-modal" class="modal" hidden>
+    <form id="saved-edit-form" class="sheet" autocomplete="off" role="dialog" aria-modal="true" aria-labelledby="saved-edit-title">
+      <div class="sheet-head">
+        <h2 id="saved-edit-title" data-i18n="save">Save</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Close" data-i18n-aria-label="close"><svg class="icon"><use href="#i-x"/></svg></button>
+      </div>
+      <div class="segmented" role="radiogroup" aria-label="Type" data-i18n-aria-label="kind">
+        <label><input type="radio" name="saved-kind" value="recipe" checked><span data-i18n="recipe">Recipe</span></label>
+        <label><input type="radio" name="saved-kind" value="batch"><span data-i18n="regularShop">Regular shop</span></label>
+      </div>
+      <label class="field">
+        <span data-i18n="name">Name</span>
+        <input id="se-name" type="text" required placeholder="e.g. Pancakes, Weekly shop" data-i18n-placeholder="seNamePlaceholder">
+      </label>
+      <div id="se-recipe-fields" class="field-row">
+        <label class="field">
+          <span data-i18n="recipeLink">Recipe link</span>
+          <input id="se-url" type="text" inputmode="url" dir="ltr" placeholder="Optional" data-i18n-placeholder="optional">
+        </label>
+        <label class="field se-servings">
+          <span data-i18n="servings">Servings</span>
+          <input id="se-servings" type="text" inputmode="numeric" placeholder="—">
+        </label>
+      </div>
+      <div class="field">
+        <span data-i18n="ingredients">Ingredients</span>
+        <ul id="se-rows" class="ing-rows"></ul>
+        <button id="se-add-row" type="button" class="link-btn"><svg class="icon"><use href="#i-plus"/></svg><span data-i18n="addRow">Add row</span></button>
+      </div>
+      <label class="field">
+        <span data-i18n="notes">Notes</span>
+        <textarea id="se-notes" rows="2" placeholder="Optional" data-i18n-placeholder="optional"></textarea>
+      </label>
+      <div class="sheet-actions">
+        <button type="button" class="btn" data-close data-i18n="cancel">Cancel</button>
+        <button id="se-save" type="submit" class="btn primary big" data-i18n="save">Save</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Import a list from a note, a recipe link or text -->
+  <div id="import-modal" class="modal" hidden>
+    <form id="import-form" class="sheet" autocomplete="off" role="dialog" aria-modal="true" aria-labelledby="import-title">
+      <div class="sheet-head">
+        <h2 id="import-title" data-i18n="importTitle">Import a list</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Close" data-i18n-aria-label="close"><svg class="icon"><use href="#i-x"/></svg></button>
+      </div>
+
+      <div id="import-source" class="receipt-box">
+        <p class="import-lead" data-i18n="importLead">Photograph a handwritten note, or paste a recipe link or a list from a chat. ChatGPT pulls out what to buy.</p>
+        <div class="receipt-buttons">
+          <button id="import-camera" type="button" class="btn primary">
+            <svg class="icon"><use href="#i-camera"/></svg>
+            <span id="import-camera-label" data-i18n="takeNote">Photograph note</span>
+          </button>
+          <label class="btn">
+            <svg class="icon"><use href="#i-image"/></svg>
+            <span data-i18n="fromGallery">From gallery</span>
+            <input id="import-gallery" type="file" accept="image/*" hidden>
+          </label>
+        </div>
+        <div id="import-photo" class="staged-photo" hidden>
+          <img id="import-preview" alt="The chosen photo" data-i18n-alt="chosenPhoto">
+          <span data-i18n="photoReady">Photo ready to read</span>
+          <button type="button" id="import-photo-remove" class="icon-btn" aria-label="Remove photo" data-i18n-aria-label="removePhoto"><svg class="icon"><use href="#i-x"/></svg></button>
+        </div>
+        <textarea id="import-text" rows="2" placeholder="Or paste a recipe link or text" data-i18n-placeholder="importTextPlaceholder" aria-label="Recipe link or text" data-i18n-aria-label="importTextAria"></textarea>
+        <div class="read-box">
+          <div class="segmented" role="radiogroup" aria-label="Reading type" data-i18n-aria-label="readType">
+            <label><input type="radio" name="import-read-model" value="basic" checked><span data-i18n="readBasic">Basic reading</span></label>
+            <label><input type="radio" name="import-read-model" value="strong"><span data-i18n="readStrong">Careful reading</span></label>
+          </div>
+          <p class="read-hint" data-i18n="readHintImport">Careful: for handwriting or unclear photos. Slower.</p>
+          <button id="import-read-go" type="button" class="btn primary" disabled data-i18n="read">Read (ChatGPT)</button>
+          <button id="import-read-cancel" type="button" class="btn" hidden data-i18n="cancelReading">Cancel reading</button>
+        </div>
+        <div id="import-status" class="status" role="status" hidden></div>
+      </div>
+
+      <div id="import-result" class="import-result" hidden>
+        <div class="segmented" role="radiogroup" aria-label="What to do with it" data-i18n-aria-label="whatToDo">
+          <label><input type="radio" name="import-dest" value="list" checked><span data-i18n="destList">Add to list</span></label>
+          <label><input type="radio" name="import-dest" value="saved"><span data-i18n="destSaved">Save to Saved</span></label>
+        </div>
+        <div class="field">
+          <span id="import-count" data-i18n="whatToAdd">What to add</span>
+          <p id="import-hint" class="hint" hidden></p>
+          <ul id="import-items" class="pick-items"></ul>
+        </div>
+      </div>
+
+      <div class="sheet-actions">
+        <button type="button" class="btn" data-close data-i18n="cancel">Cancel</button>
+        <button id="import-save" type="submit" class="btn primary big" disabled data-i18n="addToList">Add to list</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- In-app camera (Android Chrome often won't open the camera app from a web page) -->
+  <div id="camera-modal" class="modal camera" hidden>
+    <div class="camera-frame" role="dialog" aria-modal="true" aria-label="Camera" data-i18n-aria-label="camera">
+      <video id="camera-video" playsinline muted autoplay></video>
+      <div id="camera-msg" class="camera-msg" role="status" hidden></div>
+      <div class="camera-bar">
+        <button type="button" class="icon-btn camera-side" data-close aria-label="Close" data-i18n-aria-label="close"><svg class="icon"><use href="#i-x"/></svg></button>
+        <button id="camera-shoot" type="button" class="camera-shoot" aria-label="Take photo" data-i18n-aria-label="shoot" disabled></button>
+        <label class="icon-btn camera-side" aria-label="Choose from gallery" data-i18n-aria-label="pickGallery">
+          <svg class="icon"><use href="#i-image"/></svg>
+          <input id="camera-gallery" type="file" accept="image/*" hidden>
+        </label>
+      </div>
+    </div>
+  </div>
+  <input id="camera-native" type="file" accept="image/*" capture="environment" hidden>
+
+  <!-- A purchase's monster -->
+  <div id="monster-modal" class="modal" hidden>
+    <div class="sheet monster-sheet" role="dialog" aria-modal="true" aria-labelledby="monster-name">
+      <div class="sheet-head">
+        <h2 id="monster-name"></h2>
+        <button type="button" class="icon-btn" data-close aria-label="Close" data-i18n-aria-label="close"><svg class="icon"><use href="#i-x"/></svg></button>
+      </div>
+      <img id="monster-img" class="monster-img" alt="">
+      <p id="monster-bio" class="monster-bio"></p>
+      <p id="monster-from" class="hint"></p>
+      <div class="sheet-actions">
+        <button id="monster-again" type="button" class="btn"><svg class="icon"><use href="#i-sparkle"/></svg><span data-i18n="monsterAgain">Another monster</span></button>
+        <button id="monster-share" type="button" class="btn primary"><svg class="icon"><use href="#i-share"/></svg><span data-i18n="share">Share</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Receipt viewer -->
+  <div id="image-modal" class="modal dark" hidden>
+    <button type="button" class="icon-btn close-corner" data-close aria-label="Close" data-i18n-aria-label="close"><svg class="icon"><use href="#i-x"/></svg></button>
+    <img id="image-full" alt="Receipt" data-i18n-alt="receiptAlt">
+  </div>
+
+  <div id="toast" class="toast" role="status" hidden>
+    <span id="toast-text"></span>
+    <button id="toast-action" type="button" class="toast-action" hidden></button>
+  </div>
+
+  <script src="i18n.js"></script>
+  <script src="songs.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

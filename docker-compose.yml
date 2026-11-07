@@ -1,0 +1,32 @@
+services:
+  shopping:
+    build: .
+    container_name: shopping-list
+    restart: unless-stopped
+    ports:
+      # BIND_ADDR=127.0.0.1 makes the app reachable only from this machine
+      # (for example behind `tailscale serve` or another HTTPS reverse proxy).
+      - "${BIND_ADDR:-0.0.0.0}:${PORT:-8080}:8080"
+    environment:
+      # All optional. The first-run setup screen covers the same things;
+      # a value set here wins over the one stored in the app.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
+      OPENAI_MODEL_STRONG: ${OPENAI_MODEL_STRONG:-}
+      OPENAI_IMAGE_MODEL: ${OPENAI_IMAGE_MODEL:-}
+      OPENAI_IMAGE_QUALITY: ${OPENAI_IMAGE_QUALITY:-}
+      TZ: ${TZ:-UTC}
+      LOG_KEEP_DAYS: ${LOG_KEEP_DAYS:-90}
+      RECEIPTS_DIR: /receipts
+      BACKUP_DIR: /backups
+      LOG_DIR: /logs
+    volumes:
+      # Live database in a Docker volume (SQLite is safest there)
+      - shopping-data:/data
+      # Receipt photos, nightly database copies and the access log, as plain folders next to this file
+      - ./receipts:/receipts
+      - ./backups:/backups
+      - ./logs:/logs
+
+volumes:
+  shopping-data:

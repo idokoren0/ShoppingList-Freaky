@@ -1,0 +1,25 @@
+{
+  "name": "shopping-list",
+  "version": "1.0.0",
+  "description": "A self-hosted shared shopping list with receipt reading and spending tracking",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "server.js",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@fontsource/heebo": "5.3.0",
+    "@fontsource/noto-sans-hebrew": "5.3.0",
+    "@fontsource/rubik": "5.3.0",
+    "@fontsource/secular-one": "5.3.0",
+    "@fontsource/suez-one": "5.3.0",
+    "@fontsource/varela-round": "5.3.0",
+    "express": "4.21.2",
+    "multer": "2.0.2"
+  }
+}

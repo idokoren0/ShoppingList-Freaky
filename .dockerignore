@@ -1,0 +1,8 @@
+.env
+.git
+docs
+**/node_modules
+**/data
+receipts
+backups
+logs
