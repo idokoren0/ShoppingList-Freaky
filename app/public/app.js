@@ -1414,6 +1414,7 @@ function applyAiResult(ai, tryStrong = '') {
   renderPickItems();
   renderLines();
   if (ai.total == null) setStatus(t('totalUnclear', { tip: tryStrong }), 'warn');
+  else if (ai.total_summed) setStatus(t(ai.date ? 'totalSummed' : 'totalSummedToday'));
   else if (ai.problem) setStatus(t('sumsDontMatch', { tip: tryStrong }), 'warn');
   else setStatus(t('receiptRead'));
 }

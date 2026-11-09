@@ -917,14 +917,18 @@ async function readReceipt(buffer, mimetype, listItems, strong = false) {
     },
   };
 
-  const prompt = `You read shopping receipts. Amounts are in ${currency()} unless the receipt clearly shows another currency.
-Extract from the photo:
-- is_receipt: false if the image is not a receipt.
-- store: store / chain name, or null.
-- total: the final amount paid (after discounts), as a number, or null if unreadable.
+  const prompt = `You read records of shopping purchases. Amounts are in ${currency()} unless the image clearly shows another currency.
+The image can be a paper receipt, or a screenshot or photo of an online or delivery order
+(order summary, order items list, cart, confirmation, invoice or email from a delivery app or a store's website).
+Treat all of these the same way. Extract from the image:
+- is_receipt: true if the image lists bought items with prices, in any of the forms above.
+  false only if it is not a purchase record at all (e.g. a photo of the products themselves, or an unrelated picture).
+- store: store / chain / restaurant name, or null.
+- total: the final amount paid (after discounts) as printed in the image, or null if no total is shown or it is unreadable. Do not add it up yourself.
 - discount: the sum of whole-receipt discounts and rounding NOT already in the line prices, as a positive number, or null if none.
-- date: purchase date as YYYY-MM-DD, or null.
-- items: each purchased line item with its final price (after line discounts). Keep item names in the receipt's language.
+- date: purchase date as YYYY-MM-DD, or null if no date is shown. Do not guess.
+- items: each purchased line item with its final price for the quantity bought (after line discounts).
+  Include delivery and service fees as their own lines when they are shown. Keep item names in the image's language.
 - matches: for each item on the shopping list below that was bought on this receipt,
   its id and line_index = the 0-based index in your items array of the line that matched it.
   Match by meaning, not spelling: the list uses short generic names, the receipt uses brand/size/variant names
@@ -946,6 +950,12 @@ ${listText}`;
   parsed.matches = parsed.matches
     .filter((m) => validIds.has(m.item_id) && parsed.items[m.line_index] && !seen.has(m.item_id) && seen.add(m.item_id))
     .map((m) => ({ ...m, receipt_line: parsed.items[m.line_index].name }));
+  // Order screenshots often show only line prices: the total is then their sum
+  if (parsed.total == null && parsed.items.length && parsed.items.every((i) => i.price != null)) {
+    const sum = parsed.items.reduce((a, i) => a + i.price, 0) - (parsed.discount || 0);
+    parsed.total = Math.round(sum * 100) / 100;
+    parsed.total_summed = true;
+  }
   // Lets the phone suggest the stronger model when the numbers don't add up
   return { ...parsed, model: usedModel, problem: receiptProblem(parsed) };
 }
@@ -1443,6 +1453,14 @@ async function makeMonster(id, theme) {
   const ingredients = monsterIngredients(id);
   if (!ingredients.length) throw new Error('Nothing to build a monster from');
   const L = LANGUAGES[lang()];
+  // Receipt lines are often brand names or cut short: the list's own names and the store say what the products really are
+  const store = db.prepare('SELECT store FROM purchases WHERE id = ?').get(id)?.store;
+  const listNames = db.prepare('SELECT name FROM items WHERE purchase_id = ? AND deleted_at IS NULL ORDER BY id').all(id)
+    .map((r) => r.name).filter((n) => !ingredients.includes(n)).slice(0, 25);
+  const context = [
+    store && `Bought at: ${store}`,
+    listNames.length && `The same purchase as written on our shopping list: ${listNames.join(', ')}`,
+  ].filter(Boolean).join('\n');
   // A cheap text call invents the character; the picture follows its description
   const idea = await askOpenAI({
     model: model(),
@@ -1450,21 +1468,32 @@ async function makeMonster(id, theme) {
     schema: {
       type: 'object',
       additionalProperties: false,
-      required: ['name', 'bio', 'look'],
-      properties: { name: { type: 'string' }, bio: { type: 'string' }, look: { type: 'string' } },
+      required: ['products', 'name', 'bio', 'look'],
+      properties: {
+        products: { type: 'string', description: 'What each product really is, in plain English' },
+        name: { type: 'string' },
+        bio: { type: 'string' },
+        look: { type: 'string' },
+      },
     },
-    content: [{ type: 'text', text: `Invent a funny, friendly monster built entirely out of these groceries from one shopping trip:
+    content: [{ type: 'text', text: `Invent a funny, friendly monster built entirely out of the things bought on one shopping trip:
 ${ingredients.join(', ')}
+${context}
 
-- name: a playful ${L.name} name, at most 3 words, ideally a pun blending one or two of the groceries.
+They are not necessarily food: a trip can be to a pharmacy, a hardware store or anywhere else.
+- products: first work out what each product really is, in plain English (e.g. "cotton ear swabs", "dish soap", "tomatoes").
+  Receipt names are often brand names, abbreviations or cut short, so use the store and the shopping-list names to tell.
+  Never turn a non-food product into food, or food into something else.
+- name: a playful ${L.name} name, at most 3 words, ideally a pun blending one or two of the products.
 - bio: one short funny sentence in natural, everyday ${L.name} (the way a native speaker would joke,
-  not a translation), at most 16 words, family friendly. One clear joke about its habits or personality,
-  for example where it lives in the kitchen or what it's afraid of.
-- look: an English description for an illustrator, at most 70 words: which grocery forms the head, body, arms, legs and eyes,
-  and its goofy expression. Use as many of the groceries as fit, as recognizable real products.
+  not a translation), at most 16 words, family friendly. One clear joke about its habits or personality that fits
+  what it is made of, for example where in the home it lives or what it's afraid of.
+- look: an English description for an illustrator, at most 70 words: which product forms the head, body, arms, legs and eyes,
+  and its goofy expression. Use as many of the products as fit, each as the recognizable real thing it is
+  (say what it is, e.g. "white cotton swabs", not a brand name).
   Never ask for any text, letters, labels or logos in the picture.` }],
   });
-  const picture = await drawImage(`A single goofy, friendly monster made entirely of groceries. ${idea.look}
+  const picture = await drawImage(`A single goofy, friendly monster made entirely of these real products: ${idea.products}. ${idea.look}
 Style: ${MONSTER_STYLES[theme]}. Full body, centered, one character only. No text, no letters, no logos anywhere in the image.`);
   const file = `monster-${randomUUID()}.jpg`;
   fs.writeFileSync(path.join(RECEIPTS_DIR, file), picture);
