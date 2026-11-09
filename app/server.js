@@ -1359,7 +1359,32 @@ app.get('/api/purchases', wrap((req, res) => {
   res.json(purchaseDetails(purchases));
 }));
 
-function purchaseFields(b) {
+// Store names that differ only in case, spaces or punctuation ("Freshmart", "FRESH MART", "Fresh-Mart") are one store
+const storeKey = (s) => String(s || '').normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+
+// Stores already used, most used first, then most recent; one spelling per store
+function knownStores() {
+  const rows = db.prepare(`
+    SELECT TRIM(store) AS name, COUNT(*) AS n, MAX(purchased_at) AS last FROM purchases
+    WHERE deleted_at IS NULL AND store IS NOT NULL AND TRIM(store) != ''
+    GROUP BY TRIM(store) ORDER BY n DESC, last DESC
+  `).all();
+  const seen = new Set();
+  return rows.filter((r) => { const k = storeKey(r.name) || r.name; return !seen.has(k) && seen.add(k); }).map((r) => r.name);
+}
+
+// A typed or read store name, spelled the way that store was saved before
+function canonicalStore(name) {
+  const s = String(name || '').trim();
+  if (!s) return null;
+  const k = storeKey(s);
+  return (k && knownStores().find((n) => storeKey(n) === k)) || s;
+}
+
+app.get('/api/stores', wrap((req, res) => res.json(knownStores())));
+
+// matchStore: new purchases take the known spelling; an edit keeps exactly what was typed, so a spelling can be corrected
+function purchaseFields(b, { matchStore = true } = {}) {
   const buyerId = Number(b.buyer_id);
   if (!db.prepare('SELECT 1 FROM people WHERE id = ?').get(buyerId)) throw bad('Unknown buyer');
   const total = Number(b.total);
@@ -1367,7 +1392,7 @@ function purchaseFields(b) {
   return {
     buyerId,
     total: Math.round(total * 100) / 100,
-    store: String(b.store || '').trim() || null,
+    store: matchStore ? canonicalStore(b.store) : String(b.store || '').trim() || null,
     note: String(b.note || '').trim() || null,
     category: CATEGORY_KEYS.includes(b.category) ? b.category : 'groceries',
     purchasedAt: b.purchased_at && !Number.isNaN(Date.parse(b.purchased_at)) ? new Date(b.purchased_at).toISOString() : null,
@@ -1415,9 +1440,7 @@ app.post('/api/purchases', wrap((req, res) => {
 // ---------- A monster made of what we bought (on request only) ----------
 // One art style per theme
 const MONSTER_STYLES = {
-  modern: 'a glossy claymation figure photographed in a bright studio, soft shadows, plain pastel background',
   washi: 'a Japanese ukiyo-e woodblock print: flat muted colors, fine black outlines, washi paper texture',
-  konbini: 'a cute Japanese mascot character (yuru-chara) as a bold cheerful sticker with thick outlines on a plain background',
   shire: 'a cozy storybook watercolor with ink linework and warm earthy colors, like an old children\'s fairy-tale book',
 };
 const monstersRunning = new Set();
@@ -1436,7 +1459,7 @@ function startMonster(id, theme) {
   monstersRunning.add(id);
   db.prepare("UPDATE purchases SET monster_status = 'pending' WHERE id = ?").run(id);
   broadcast('purchases');
-  makeMonster(id, MONSTER_STYLES[theme] ? theme : 'modern')
+  makeMonster(id, MONSTER_STYLES[theme] ? theme : 'shire')
     .catch((e) => {
       console.error('Monster failed:', e.message);
       // A key limited to text can't draw: say so, instead of a generic failure
@@ -1517,7 +1540,7 @@ app.patch('/api/purchases/:id', wrap((req, res) => {
   const id = Number(req.params.id);
   const cur = db.prepare('SELECT * FROM purchases WHERE id = ? AND deleted_at IS NULL').get(id);
   if (!cur) throw bad('Purchase not found');
-  const f = purchaseFields({ ...cur, ...req.body });
+  const f = purchaseFields({ ...cur, ...req.body }, { matchStore: false });
   db.prepare('UPDATE purchases SET buyer_id = ?, total = ?, store = ?, note = ?, category = ?, purchased_at = ? WHERE id = ?')
     .run(f.buyerId, f.total, f.store, f.note, f.category, f.purchasedAt || cur.purchased_at, id);
   broadcast('purchases');

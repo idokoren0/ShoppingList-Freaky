@@ -343,10 +343,8 @@ async function undoOp(op) {
 // ---------- Theme (per phone) ----------
 // bar: browser theme-color, light and dark; swatch: the picker's preview of each world
 const THEMES = {
-  modern: { name: 'themeModern', bar: ['#ffffff', '#121212'], swatch: ['#ffffff', '#1b1b1b', '#009944', '#e60012', '#0079c2'] },
-  washi: { name: 'themeWashi', bar: ['#23395d', '#203760'], swatch: ['#f2eee5', '#23395d', '#c0392b', '#e3b448'] },
-  konbini: { name: 'themeKonbini', bar: ['#ffffff', '#16181c'], swatch: ['#ffffff', '#f58220', '#00873c', '#e60012', '#ffd400'] },
-  shire: { name: 'themeShire', bar: ['#4a2c14', '#140d06'], swatch: ['#eee7d8', '#4a2c14', '#2e5e34', '#a3302a'] },
+  shire: { name: 'themeShire', bar: ['#4a2c14', '#4c2f18'], swatch: ['#eee7d8', '#4a2c14', '#2e5e34', '#a3302a', '#c99a3a'] },
+  washi: { name: 'themeWashi', bar: ['#1c3157', '#172848'], swatch: ['#f3eee2', '#1c3157', '#c23b2a', '#c9a14a', '#1f1c19'] },
 };
 const THEME_ALIASES = { wa: 'washi' }; // the first Japanese theme, retired
 const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -381,7 +379,7 @@ $('mode-toggle').addEventListener('click', () => {
 
 function applyTheme(name) {
   const wanted = THEME_ALIASES[name] || name;
-  const theme = THEMES[wanted] ? wanted : 'modern';
+  const theme = THEMES[wanted] ? wanted : 'shire'; // also where a retired theme lands
   document.documentElement.dataset.theme = theme;
   document.querySelector('meta[name=theme-color]').content = THEMES[theme].bar[isDark() ? 1 : 0];
 }
@@ -575,17 +573,17 @@ function renderItems() {
     groups.get(key).push(i);
   }
   const keys = [...groups.keys()].sort((a, b) => (a === null) - (b === null) || order.indexOf(a) - order.indexOf(b));
-  // data-code / --sec-c / data-count feed each theme's section signage (metro line, shelf rail count)
+  // data-count: the washi theme writes the number of items beside the section name
   const sections = keys.map((k) => `
-    <section class="sec" data-sec="${k || 'unsorted'}" style="--sec-c: var(--sec-${k || 'other'})">
-      <h3 class="sec-title" data-code="${k ? String(order.indexOf(k) + 1).padStart(2, '0') : '··'}" data-count="${groups.get(k).length}">${esc(sectionName(k))}</h3>
+    <section class="sec" data-sec="${k || 'unsorted'}">
+      <h3 class="sec-title" data-count="${groups.get(k).length}">${esc(sectionName(k))}</h3>
       <ul class="items">${groups.get(k).map(itemRow).join('')}</ul>
     </section>`).join('');
   // What's in the cart sinks to the bottom, folded away
   const folded = state.cartFolded !== false;
   const cartSec = cart.length ? `
-    <section class="sec cart-sec ${folded ? 'folded' : ''}" data-sec="cart" style="--sec-c: var(--muted)">
-      <h3 class="sec-title" data-code="✓" data-count="${cart.length}">
+    <section class="sec cart-sec ${folded ? 'folded' : ''}" data-sec="cart">
+      <h3 class="sec-title">
         <button type="button" class="cart-fold" data-cart-fold aria-expanded="${!folded}">${esc(t('inCartN', { n: cart.length }))}<span class="flip-rtl">${icon('chev-r')}</span></button>
       </h3>
       <ul class="items">${cart.map(itemRow).join('')}</ul>
@@ -1044,8 +1042,35 @@ function openPurchase({ fromList = true, cartIds = [] } = {}) {
   $('p-line-add-name').value = '';
   $('p-monster-line').hidden = !state.aiEnabled;
   applyPhotoKind();
+  loadStores();
   openModal($('purchase-modal'));
 }
+
+// Stores used before, suggested under the store field; the last list is kept for offline use
+const storeKey = (s) => String(s || '').normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+let knownStores = loadJSON('stores', []);
+
+function fillStoreNames() {
+  $('store-names').replaceChildren(...knownStores.map((name) => Object.assign(document.createElement('option'), { value: name })));
+}
+
+async function loadStores() {
+  fillStoreNames();
+  try {
+    knownStores = await api('/api/stores');
+    saveJSON('stores', knownStores);
+    fillStoreNames();
+  } catch { /* offline: the saved list is enough */ }
+}
+
+// "Freshmart" or "FRESH MART" becomes "Fresh Mart" when that is how the store was saved before.
+// Not when editing, so a wrong spelling can be corrected.
+$('p-store').addEventListener('change', () => {
+  if (state.draft?.editId) return;
+  const k = storeKey($('p-store').value);
+  const known = k && knownStores.find((n) => storeKey(n) === k);
+  if (known) $('p-store').value = known;
+});
 
 function openEditPurchase(p) {
   if (!requireOnline()) return;
@@ -1062,6 +1087,7 @@ function openEditPurchase(p) {
   $('p-items-field').hidden = true;
   $('p-lines').hidden = true;
   $('p-monster-line').hidden = true;
+  loadStores();
   openModal($('purchase-modal'));
 }
 
@@ -1405,7 +1431,7 @@ function applyAiResult(ai, tryStrong = '') {
   }
   d.linesKind = 'receipt';
   if (ai.total != null) $('p-total').value = ai.total.toFixed(2);
-  if (ai.store) $('p-store').value = ai.store;
+  if (ai.store) $('p-store').value = knownStores.find((n) => storeKey(n) === storeKey(ai.store)) || ai.store;
   if (ai.date && /^\d{4}-\d{2}-\d{2}$/.test(ai.date)) $('p-date').value = ai.date;
   const byLine = new Map(ai.matches.map((m) => [m.line_index, m.item_id]));
   d.lines = ai.items.map((it, idx) => ({ name: it.name, price: it.price, item_id: byLine.get(idx) || null }));

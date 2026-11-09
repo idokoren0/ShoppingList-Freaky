@@ -7,8 +7,8 @@ This is the expanded edition: everything in the basic one, plus settling up by h
 English and Hebrew (right-to-left) are built in, and adding a language is a matter of translating one file.
 
 <p>
-  <img src="docs/screenshots/list.png" width="200" alt="The shopping list, sorted by store section">
-  <img src="docs/screenshots/list-konbini-dark.png" width="200" alt="The same list in the Konbini theme, dark mode">
+  <img src="docs/screenshots/list.jpg" width="200" alt="The shopping list, sorted by store section">
+  <img src="docs/screenshots/list-japanese-dark.jpg" width="200" alt="The same list in the Traditional Japanese theme, dark mode">
   <img src="docs/screenshots/summary.png" width="200" alt="Monthly spending per person">
   <img src="docs/screenshots/list-hebrew.png" width="200" alt="The app in Hebrew, right to left">
 </p>
@@ -23,11 +23,12 @@ English and Hebrew (right-to-left) are built in, and adding a language is a matt
 - **Two reading modes.** A cheap default model for clear photos, and a careful model for faded receipts, handwriting or crowded photos. You choose per photo, and you can cancel a reading.
 - **Import a list** from a photo of a handwritten note, a recipe link (it reads the recipe's ingredient data) or pasted text. Each line can be corrected before it's added.
 - **Saved recipes and regular shops.** Add a recipe to the list scaled to any number of servings. Items already on the list get a note instead of a duplicate.
+- **Store names stay tidy.** The store field suggests stores you used before, and a name typed with different case, spacing or punctuation is saved under the existing spelling.
 - **Spending summary.** Who spent what per month and overall, by category and by store, with a CSV export.
 - **Settle up.** The balance at the top of the summary shows who is ahead and how much evens it out. Record money one of you sent the other, or a bill paid outside the app (electricity, rent), with a note. Every settlement stays listed and can be deleted or undone.
 - **A song for the store.** Store mode suggests a goofy song from a hand-picked list of about 110 (no AI), preferring songs about something on your list, with a YouTube search link. A Hebrew household gets Hebrew and English songs; any other language gets English ones.
 - **Purchase monsters.** Optionally, OpenAI draws a friendly monster built out of what you bought, with a name and a one-line bio in your language, in the art style of your theme. Ask for it when you record a purchase or later from Purchases, then share the picture.
-- **Four themes**, chosen per phone: Modern Japanese (metro-line sections), Traditional Japanese, Konbini (convenience-store shelves) and Cottage larder. Each has a light and a dark mode; the button in the header switches between automatic, dark and light.
+- **Two themes**, chosen per phone: Cottage larder (oak shelves, a wax-seal tick) and Traditional Japanese (washi paper, an indigo noren, brush strokes and a vermilion seal). Each has a light and a dark mode; the button in the header switches between automatic, dark and light.
 - **Installable.** Add it to the home screen on iPhone or Android and it opens like an app.
 - **Daily database backups** with 14 days kept, plus a per-request access log.
 
@@ -166,7 +167,7 @@ app/
     app.js             the whole client: list, purchases, import, saved, summary, settings, setup
     i18n.js            UI text for every language
     songs.js           the store songs, hand-picked, with the list words each one is about
-    style.css          layout and the four themes
+    style.css          layout and the two themes
     sw.js              service worker (offline app shell)
 ```
 

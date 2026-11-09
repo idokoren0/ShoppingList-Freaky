@@ -367,9 +367,7 @@ const I18N = {
     undoOffline: "Offline, can't undo now",
     serverUnreachable: "Can't reach the server",
     // Themes
-    themeModern: 'Modern Japanese',
     themeWashi: 'Traditional Japanese',
-    themeKonbini: 'Konbini',
     themeShire: 'Cottage larder',
     // Settings
     appearance: 'Appearance',
@@ -753,9 +751,7 @@ const I18N = {
     changeNotSaved: 'שינוי לא נשמר: {msg}',
     undoOffline: 'אין חיבור, אי אפשר לבטל עכשיו',
     serverUnreachable: 'אין חיבור לשרת',
-    themeModern: 'יפני מודרני',
     themeWashi: 'יפני מסורתי',
-    themeKonbini: 'קונביני',
     themeShire: 'מזווה כפרי',
     appearance: 'עיצוב',
     language: 'שפה',
