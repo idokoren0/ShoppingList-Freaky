@@ -58,6 +58,8 @@ Create a key at <https://platform.openai.com/api-keys> and paste it into the set
 | Careful reading (faded receipts, handwriting) | `gpt-6.1-terra` | $0.005 per photo |
 | Monster picture | `gpt-image-2`, medium quality | $0.05 each |
 
+Reading is automatic by default: a quick look at a small preview of the photo sends handwriting and unclear photos to the careful model, and everything else to the basic one. You can also pick basic or careful yourself.
+
 A restricted key needs the **Images** permission for monsters.
 
 ## Settings file

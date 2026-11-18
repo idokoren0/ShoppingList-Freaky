@@ -31,12 +31,12 @@
   <link rel="stylesheet" href="/fonts/rubik/latin-500.css">
   <link rel="stylesheet" href="/fonts/rubik/hebrew-600.css">
   <link rel="stylesheet" href="/fonts/rubik/latin-600.css">
-  <link rel="stylesheet" href="/fonts/frank-ruhl-libre/hebrew-400.css">
-  <link rel="stylesheet" href="/fonts/frank-ruhl-libre/latin-400.css">
-  <link rel="stylesheet" href="/fonts/frank-ruhl-libre/hebrew-500.css">
-  <link rel="stylesheet" href="/fonts/frank-ruhl-libre/latin-500.css">
-  <link rel="stylesheet" href="/fonts/frank-ruhl-libre/hebrew-700.css">
-  <link rel="stylesheet" href="/fonts/frank-ruhl-libre/latin-700.css">
+  <link rel="stylesheet" href="/fonts/assistant/hebrew-400.css">
+  <link rel="stylesheet" href="/fonts/assistant/latin-400.css">
+  <link rel="stylesheet" href="/fonts/assistant/hebrew-500.css">
+  <link rel="stylesheet" href="/fonts/assistant/latin-500.css">
+  <link rel="stylesheet" href="/fonts/assistant/hebrew-700.css">
+  <link rel="stylesheet" href="/fonts/assistant/latin-700.css">
   <link rel="stylesheet" href="style.css">
   <title data-i18n="appTitle">Shopping List</title>
 </head>
@@ -477,10 +477,11 @@
         <img id="receipt-preview" class="receipt-preview" alt="The receipt photo" data-i18n-alt="receiptPhotoAlt" hidden>
         <div id="receipt-read" class="read-box" hidden>
           <div class="segmented" role="radiogroup" aria-label="Reading type" data-i18n-aria-label="readType">
-            <label><input type="radio" name="receipt-read-model" value="basic" checked><span data-i18n="readBasic">Basic reading</span></label>
-            <label><input type="radio" name="receipt-read-model" value="strong"><span data-i18n="readStrong">Careful reading</span></label>
+            <label><input type="radio" name="receipt-read-model" value="auto" checked><span data-i18n="readAuto">Automatic</span></label>
+            <label><input type="radio" name="receipt-read-model" value="basic"><span data-i18n="readBasic">Basic</span></label>
+            <label><input type="radio" name="receipt-read-model" value="strong"><span data-i18n="readStrong">Careful</span></label>
           </div>
-          <p id="receipt-read-hint" class="read-hint" data-i18n="readHintReceipt">Careful: for faded, crumpled or unclear receipts. Slower.</p>
+          <p id="receipt-read-hint" class="read-hint" data-i18n="readHintReceipt">Automatic: a handwritten receipt or an unclear photo gets the careful reading, everything else the basic one.</p>
           <button id="receipt-read-go" type="button" class="btn primary" data-i18n="readReceipt">Read receipt (ChatGPT)</button>
           <button id="receipt-read-cancel" type="button" class="btn" hidden data-i18n="cancelReading">Cancel reading</button>
         </div>
@@ -651,10 +652,11 @@
         <textarea id="import-text" rows="2" placeholder="Or paste a recipe link or text" data-i18n-placeholder="importTextPlaceholder" aria-label="Recipe link or text" data-i18n-aria-label="importTextAria"></textarea>
         <div class="read-box">
           <div class="segmented" role="radiogroup" aria-label="Reading type" data-i18n-aria-label="readType">
-            <label><input type="radio" name="import-read-model" value="basic" checked><span data-i18n="readBasic">Basic reading</span></label>
-            <label><input type="radio" name="import-read-model" value="strong"><span data-i18n="readStrong">Careful reading</span></label>
+            <label><input type="radio" name="import-read-model" value="auto" checked><span data-i18n="readAuto">Automatic</span></label>
+            <label><input type="radio" name="import-read-model" value="basic"><span data-i18n="readBasic">Basic</span></label>
+            <label><input type="radio" name="import-read-model" value="strong"><span data-i18n="readStrong">Careful</span></label>
           </div>
-          <p class="read-hint" data-i18n="readHintImport">Careful: for handwriting or unclear photos. Slower.</p>
+          <p class="read-hint" data-i18n="readHintImport">Automatic: handwriting or an unclear photo gets the careful reading, everything else the basic one.</p>
           <button id="import-read-go" type="button" class="btn primary" disabled data-i18n="read">Read (ChatGPT)</button>
           <button id="import-read-cancel" type="button" class="btn" hidden data-i18n="cancelReading">Cancel reading</button>
         </div>

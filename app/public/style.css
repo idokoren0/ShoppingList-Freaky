@@ -206,8 +206,8 @@
   --person-3: #8a6a32;
   --chart-0: #3d6eb0;
   --chart-1: #c8642a;
-  --font-body: "Frank Ruhl Libre", "Times New Roman", serif;
-  --font-display: "Frank Ruhl Libre", "Times New Roman", serif;
+  --font-body: "Assistant", "Rubik", -apple-system, "Segoe UI", Arial, sans-serif;
+  --font-display: "Assistant", "Rubik", -apple-system, "Segoe UI", Arial, sans-serif;
   --body-size: 17.5px;
   --title-size: 23px;
   --title-weight: 700;
@@ -1397,6 +1397,8 @@ body.store-mode .item .item-main { cursor: pointer; }
 :root[data-theme="shire"] .tick { border-color: var(--tick-ring); }
 :root[data-theme="shire"] .btn:not(.primary),
 :root[data-theme="shire"] .theme-option { box-shadow: 0 1px 0 color-mix(in srgb, var(--line-strong) 45%, transparent); }
+/* The purchase actions are underlined text, not buttons: no edge under them */
+:root[data-theme="shire"] .purchase .p-actions .btn { box-shadow: none; }
 :root[data-theme="shire"] .sheet { background: var(--plaster), var(--bg); }
 :root[data-theme="shire"] .modal { background: rgba(20, 12, 5, .55); }
 :root[data-theme="shire"] .toast { background: var(--bar-bg); color: var(--bar-text); box-shadow: 0 0 0 1px var(--brass), 0 8px 20px var(--shadow); }

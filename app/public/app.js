@@ -1001,6 +1001,15 @@ function todayStr(d = new Date()) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+// A date read off a receipt is used only if it is not in the future and under a year old;
+// otherwise it was misread (day and year swapped), so the form keeps today
+function plausibleDate(s) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s || '')) return false;
+  const yearAgo = new Date();
+  yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+  return s <= todayStr() && s >= todayStr(yearAgo);
+}
+
 function fillPurchaseSelects(buyerId, category) {
   $('p-buyer').innerHTML = state.people
     .map((p) => `<option value="${p.id}" ${p.id === buyerId ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
@@ -1074,7 +1083,7 @@ $('p-store').addEventListener('change', () => {
 
 function openEditPurchase(p) {
   if (!requireOnline()) return;
-  state.draft = { editId: p.id, checked: new Set(), aiMatched: new Map(), lines: [], allowZero: p.total === 0 };
+  state.draft = { editId: p.id, origDay: todayStr(new Date(p.purchased_at)), checked: new Set(), aiMatched: new Map(), lines: [], allowZero: p.total === 0 };
   $('purchase-form').reset();
   setTotalRequired(p.total !== 0);
   $('purchase-title').textContent = t('editPurchase');
@@ -1142,8 +1151,8 @@ function renderPickItems() {
 // What the photo is of: a receipt, or the groceries themselves (no receipt, or a gift)
 const photoKind = () => document.querySelector('input[name=photo-kind]:checked').value;
 const KIND_TEXT = {
-  receipt: { camera: 'takeReceipt', alt: 'receiptPhotoAlt', go: 'readReceipt', basic: 'readBasic', strong: 'readStrong', hint: 'readHintReceipt', ready: 'photoStagedAi' },
-  products: { camera: 'takeProducts', alt: 'productsPhotoAlt', go: 'readProductsGo', basic: 'productsBasic', strong: 'productsStrong', hint: 'productsStrongHint', ready: 'productsStaged' },
+  receipt: { camera: 'takeReceipt', alt: 'receiptPhotoAlt', go: 'readReceipt', auto: 'readAuto', basic: 'readBasic', strong: 'readStrong', hint: 'readHintReceipt', ready: 'photoStagedAi' },
+  products: { camera: 'takeProducts', alt: 'productsPhotoAlt', go: 'readProductsGo', auto: 'productsAuto', basic: 'productsBasic', strong: 'productsStrong', hint: 'productsStrongHint', ready: 'productsStaged' },
 };
 
 function setTotalRequired(required) {
@@ -1159,7 +1168,8 @@ function applyPhotoKind() {
   $('receipt-preview').alt = t(txt.alt);
   $('receipt-read-go').textContent = t(txt.go);
   $('receipt-read-hint').textContent = t(txt.hint);
-  const [basic, strong] = document.querySelectorAll('#receipt-read .segmented span');
+  const [auto, basic, strong] = document.querySelectorAll('#receipt-read .segmented span');
+  auto.textContent = t(txt.auto);
   basic.textContent = t(txt.basic);
   strong.textContent = t(txt.strong);
   // Groceries someone gave you cost nothing, so the amount is optional here
@@ -1311,7 +1321,7 @@ function setStatus(text, kind = '', id = 'receipt-status') {
 }
 
 // Shrink the photo before upload: faster on mobile data, and normalizes iPhone HEIC to JPEG.
-async function prepareImage(file) {
+async function prepareImage(file, MAX = 2400, quality = 0.85) {
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise((resolve, reject) => {
@@ -1320,19 +1330,35 @@ async function prepareImage(file) {
       im.onerror = () => reject(new Error(t('cantOpenImage')));
       im.src = url;
     });
-    const MAX = 2400;
     const scale = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
     const canvas = document.createElement('canvas');
     canvas.width = Math.round(img.naturalWidth * scale);
     canvas.height = Math.round(img.naturalHeight * scale);
     canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-    return await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+    return await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
   } finally {
     URL.revokeObjectURL(url);
   }
 }
 
-const readStrong = (prefix) => document.querySelector(`input[name=${prefix}-model]:checked`).value === 'strong';
+// Automatic mode: a small copy of the photo, for the server's quick look at how clear it is.
+// The API bills a photo by its size, so the look costs a fraction of a reading.
+async function previewOf(blob) {
+  try {
+    const small = await prepareImage(blob, 512, 0.7);
+    return await new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = reject;
+      r.readAsDataURL(small);
+    });
+  } catch {
+    return null; // the server then reads it the cheap way
+  }
+}
+
+// 'auto', 'basic' or 'strong'
+const readModeOf = (prefix) => document.querySelector(`input[name=${prefix}-model]:checked`).value;
 
 // While reading: the read button turns into a cancel button and the choice is locked
 function readBusy(prefix, controller) {
@@ -1341,7 +1367,7 @@ function readBusy(prefix, controller) {
   document.querySelectorAll(`input[name=${prefix}-model]`).forEach((r) => { r.disabled = Boolean(controller); });
 }
 
-// A new photo is only attached; reading it is a separate step, after choosing basic or careful
+// A new photo is only attached; reading it is a separate step, after choosing automatic, basic or careful
 async function handlePhoto(file) {
   if (!file || !state.draft) return;
   const draft = state.draft;
@@ -1366,7 +1392,7 @@ async function handlePhoto(file) {
 async function readReceiptPhoto() {
   const draft = state.draft;
   if (!draft?.photoBlob || draft.reading) return;
-  const strong = readStrong('receipt-read');
+  const mode = readModeOf('receipt-read');
   const kind = photoKind();
   const products = kind === 'products';
   const controller = new AbortController();
@@ -1374,19 +1400,21 @@ async function readReceiptPhoto() {
   readBusy('receipt-read', controller);
   document.querySelectorAll('input[name=photo-kind]').forEach((r) => { r.disabled = true; });
   $('p-save').disabled = true;
-  if (products) setStatus(strong ? t('readingProductsStrong') : t('readingProducts'), 'loading');
-  else setStatus(strong ? t('readingReceiptStrong') : t('readingReceipt'), 'loading');
-  const tryStrong = strong ? '' : products ? t('tryStrongProducts') : t('tryStrong');
+  const suffix = mode === 'strong' ? 'Strong' : mode === 'auto' ? 'Auto' : '';
+  setStatus(t(`${products ? 'readingProducts' : 'readingReceipt'}${suffix}`), 'loading');
+  // Suggest the careful reading only when it has not already been used
+  const tryStrong = mode === 'strong' ? '' : products ? t('tryStrongProducts') : t('tryStrong');
   try {
     if (!draft.receiptFile) {
       const fd = new FormData();
       fd.append('photo', draft.photoBlob, products ? 'products.jpg' : 'receipt.jpg');
       draft.receiptFile = (await api('/api/receipt', { method: 'POST', body: fd, signal: controller.signal })).file;
     }
-    const res = await api('/api/receipt/scan', { json: { file: draft.receiptFile, strong, kind }, signal: controller.signal });
+    const preview = mode === 'auto' ? await previewOf(draft.photoBlob) : null;
+    const res = await api('/api/receipt/scan', { json: { file: draft.receiptFile, mode, strong: mode === 'strong', kind, preview }, signal: controller.signal });
     if (state.draft !== draft) return;
     if (res.ai) {
-      applyAiResult(res.ai, tryStrong);
+      applyAiResult(res.ai, res.ai.escalated ? '' : tryStrong);
     } else if (products) {
       const why = res.aiError === 'no_products' ? t('noProductsFound') : t('couldNotReadProducts');
       setStatus(t('addManually', { why, tip: tryStrong }), 'warn');
@@ -1413,6 +1441,10 @@ function applyAiResult(ai, tryStrong = '') {
   const d = state.draft;
   d.aiParsed = true;
   d.editingLine = null;
+  // Automatic mode said why it switched to the careful reading
+  const upgraded = !ai.escalated ? ''
+    : ai.kind === 'products' ? t('upgradedProducts')
+    : ai.escalated === 'handwritten' ? t('upgradedHandwritten') : t('upgradedUnclear');
   if (ai.kind === 'products') {
     d.linesKind = 'products';
     // A new reading replaces the last one's ticks, but not ticks made by hand from the list
@@ -1425,24 +1457,24 @@ function applyAiResult(ai, tryStrong = '') {
     renderLines();
     const n = ai.items.length;
     const m = ai.matches.length;
-    setStatus(t('productsFound', { found: t('productsFoundN', { n }), list: m ? t('fromListN', { n: m }) : '', tip: tryStrong }));
+    setStatus(upgraded + t('productsFound', { found: t('productsFoundN', { n }), list: m ? t('fromListN', { n: m }) : '', tip: tryStrong }));
     $('p-lines').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     return;
   }
   d.linesKind = 'receipt';
   if (ai.total != null) $('p-total').value = ai.total.toFixed(2);
   if (ai.store) $('p-store').value = knownStores.find((n) => storeKey(n) === storeKey(ai.store)) || ai.store;
-  if (ai.date && /^\d{4}-\d{2}-\d{2}$/.test(ai.date)) $('p-date').value = ai.date;
+  if (plausibleDate(ai.date)) $('p-date').value = ai.date;
   const byLine = new Map(ai.matches.map((m) => [m.line_index, m.item_id]));
   d.lines = ai.items.map((it, idx) => ({ name: it.name, price: it.price, item_id: byLine.get(idx) || null }));
   d.aiMatched = new Map(ai.matches.map((m) => [m.item_id, { line: m.receipt_line, price: ai.items[m.line_index]?.price ?? null }]));
   for (const m of ai.matches) d.checked.add(m.item_id);
   renderPickItems();
   renderLines();
-  if (ai.total == null) setStatus(t('totalUnclear', { tip: tryStrong }), 'warn');
-  else if (ai.total_summed) setStatus(t(ai.date ? 'totalSummed' : 'totalSummedToday'));
-  else if (ai.problem) setStatus(t('sumsDontMatch', { tip: tryStrong }), 'warn');
-  else setStatus(t('receiptRead'));
+  if (ai.total == null) setStatus(upgraded + t('totalUnclear', { tip: tryStrong }), 'warn');
+  else if (ai.total_summed) setStatus(upgraded + t(ai.date ? 'totalSummed' : 'totalSummedToday'));
+  else if (ai.problem) setStatus(upgraded + t('sumsDontMatch', { tip: tryStrong }), 'warn');
+  else setStatus(upgraded + t('receiptRead'));
 }
 
 $('receipt-read-go').addEventListener('click', readReceiptPhoto);
@@ -1464,15 +1496,18 @@ $('purchase-form').addEventListener('submit', async (e) => {
     toast(t('addSomething'));
     return $('p-line-add-name').focus();
   }
-  const dateVal = $('p-date').value;
+  const day = $('p-date').value || todayStr();
   const fields = {
     buyer_id: Number($('p-buyer').value),
     total,
     store: $('p-store').value,
     note: $('p-note').value,
     category: $('p-category').value,
-    // Today keeps the exact time; another date is stored at local noon.
-    purchased_at: !dateVal || dateVal === todayStr() ? undefined : new Date(`${dateVal}T12:00:00`).toISOString(),
+    // Another day is stored at local noon. Today keeps the exact time: a new purchase gets it from the
+    // server, an edit moved to today sends it. An edit whose day is untouched sends nothing, keeping its time.
+    purchased_at: d.editId && day === d.origDay ? undefined
+      : day !== todayStr() ? new Date(`${day}T12:00:00`).toISOString()
+      : d.editId ? new Date().toISOString() : undefined,
   };
 
   if (d.editId) {
@@ -1673,20 +1708,22 @@ async function runImport(source) {
     $('import-camera').disabled = on;
     $('import-save').disabled = on || !draft.items.length;
   };
-  const strong = readStrong('import-read');
+  const mode = readModeOf('import-read');
   busy(true);
   setStatus(source.photo
-    ? (strong ? t('readingNoteStrong') : t('readingNote'))
+    ? t(mode === 'strong' ? 'readingNoteStrong' : mode === 'auto' ? 'readingNoteAuto' : 'readingNote')
     : /https?:\/\//i.test(source.text) ? t('readingPage') : t('reading'), 'loading', 'import-status');
   try {
     let res;
     if (source.photo) {
       const fd = new FormData();
       fd.append('photo', await prepareImage(source.photo), 'note.jpg');
-      if (strong) fd.append('strong', '1');
+      fd.append('mode', mode);
+      const preview = mode === 'auto' ? await previewOf(source.photo) : null;
+      if (preview) fd.append('preview', preview);
       res = await api('/api/import', { method: 'POST', body: fd, signal: controller.signal });
     } else {
-      res = await api('/api/import', { json: { text: source.text, strong }, signal: controller.signal });
+      res = await api('/api/import', { json: { text: source.text, mode }, signal: controller.signal });
     }
     if (state.importDraft !== draft) return;
     showImport(res);
@@ -1695,7 +1732,7 @@ async function runImport(source) {
     if (err.name === 'AbortError') return setStatus(t('readCancelled'), '', 'import-status');
     let msg = IMPORT_ERRORS[err.message] ? t(IMPORT_ERRORS[err.message])
       : err instanceof OfflineError ? t('importOffline') : t('readFailed', { msg: err.message });
-    if (err.message === 'nothing_found' && source.photo && !strong) msg += t('tryStrong');
+    if (err.message === 'nothing_found' && source.photo && mode !== 'strong') msg += t('tryStrong');
     setStatus(msg, 'warn', 'import-status');
   } finally {
     busy(false);

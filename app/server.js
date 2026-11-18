@@ -17,9 +17,60 @@ const BACKUP_KEEP = 14;
 const LOG_DIR = process.env.LOG_DIR || path.join(DATA_DIR, 'logs');
 const LOG_KEEP_DAYS = Number(process.env.LOG_KEEP_DAYS || 90);
 const DEFAULT_MODEL = 'gpt-4.1-mini';
-// Careful reading (handwriting, faded or crumpled receipts), used only when the person picks it
+// Careful reading (handwriting, faded or crumpled receipts): chosen by the person, or by the automatic mode
 const DEFAULT_MODEL_STRONG = 'gpt-6.1-terra';
 const env = (name) => (process.env[name] || '').trim();
+
+// How a photo is read: 'basic', 'strong', or 'auto' (the phone's default).
+// Older phones send strong: true/false instead of mode.
+function readMode(body) {
+  const m = body?.mode ?? body?.strong;
+  if (m === 'strong' || m === true || m === '1') return 'strong';
+  if (m === 'basic' || m === false || m === '0') return 'basic';
+  return 'auto';
+}
+
+// Automatic mode: a quick look at a small preview of the photo picks the model,
+// so every photo is read once. run(strong) does the reading. The phone makes the
+// preview (512px): the API bills a photo by its pixels and ignores detail: 'low' on
+// gpt-4.1-mini, so the preview is what keeps the look cheap (a few hundred tokens, not ~4000).
+// Without a preview (an older phone) the photo is read the cheap way.
+async function readAuto(mode, run, preview, what) {
+  if (mode === 'strong') return run(true);
+  if (mode === 'basic' || modelStrong() === model()) return run(false);
+  let reason = null;
+  if (typeof preview === 'string' && /^data:image\/(jpeg|png|webp);base64,/.test(preview) && preview.length < 300000) {
+    try {
+      reason = await photoCheck(preview, what);
+    } catch (e) {
+      console.error('Photo check failed:', e.message); // read it the cheap way
+    }
+  }
+  if (!reason) return run(false);
+  return { ...(await run(true)), escalated: reason };
+}
+
+// The quick look on the basic model: a one-word answer.
+// Returns 'handwritten', 'unclear', or null when the basic model can read it.
+async function photoCheck(dataUrl, what) {
+  const schema = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['handwritten', 'clarity'],
+    properties: { handwritten: { type: 'boolean' }, clarity: { type: 'string', enum: ['clear', 'unclear'] } },
+  };
+  const prompt = `This is a small preview of a photo of ${what}. Do not read it. Only judge the photo itself.
+- handwritten: true if any of the writing in it is by hand.
+- clarity: "unclear" if the photo is blurry, faded, crumpled, dark, cut off or taken at a steep angle.
+  Print that is only too small to read in this preview is fine: judge the photo, not the preview size.`;
+  const content = [
+    { type: 'text', text: prompt },
+    { type: 'image_url', image_url: { url: dataUrl, detail: 'low' } },
+  ];
+  const r = await askOpenAI({ model: model(), content, name: 'photo_check', schema, timeout: 20000 });
+  return r.handwritten ? 'handwritten' : r.clarity === 'unclear' ? 'unclear' : null;
+}
+const RECEIPT_WHAT = 'a shop receipt or an order screenshot';
 
 // One structured-output call; returns the parsed JSON
 async function askOpenAI({ model, content, name, schema, timeout = 90000, key = apiKey() }) {
@@ -39,6 +90,8 @@ async function askOpenAI({ model, content, name, schema, timeout = 90000, key = 
   if (!resp.ok) throw new Error(body?.error?.message || `OpenAI HTTP ${resp.status}`);
   const out = body?.choices?.[0]?.message?.content;
   if (!out) throw new Error('Empty response from OpenAI');
+  const u = body.usage || {};
+  console.log(`AI ${name} ${model} in=${u.prompt_tokens} out=${u.completion_tokens}`);
   return JSON.parse(out);
 }
 
@@ -839,7 +892,9 @@ app.post('/api/receipt', upload.single('photo'), wrap(async (req, res) => {
       result.aiError = 'not_configured';
     } else {
       try {
-        result.ai = await readReceipt(req.file.buffer, req.file.mimetype, openItems(), req.query.strong === '1');
+        const mode = readMode({ mode: req.query.mode, strong: req.query.strong });
+        result.ai = await readAuto(mode, (strong) => readReceipt(req.file.buffer, req.file.mimetype, openItems(), strong),
+          req.body?.preview, RECEIPT_WHAT);
       } catch (e) {
         console.error('Receipt AI failed:', e.message);
         result.aiError = e.message;
@@ -849,7 +904,7 @@ app.post('/api/receipt', upload.single('photo'), wrap(async (req, res) => {
   res.json(result);
 }));
 
-// Read a receipt photo that was already uploaded (the phone reads after choosing basic or careful)
+// Read a receipt photo that was already uploaded (the phone reads after choosing automatic, basic or careful)
 app.post('/api/receipt/scan', wrap(async (req, res) => {
   const file = String(req.body?.file || '');
   if (!/^[0-9a-f-]{36}\.(jpg|png)$/.test(file)) throw bad('Bad file');
@@ -860,7 +915,11 @@ app.post('/api/receipt/scan', wrap(async (req, res) => {
   const products = req.body?.kind === 'products';
   try {
     const read = products ? readProducts : readReceipt;
-    const ai = await read(fs.readFileSync(full), file.endsWith('.png') ? 'image/png' : 'image/jpeg', openItems(), req.body?.strong === true);
+    const buffer = fs.readFileSync(full);
+    const mime = file.endsWith('.png') ? 'image/png' : 'image/jpeg';
+    const items = openItems();
+    const ai = await readAuto(readMode(req.body), (strong) => read(buffer, mime, items, strong),
+      req.body?.preview, products ? 'groceries and household products' : RECEIPT_WHAT);
     res.json({ file, ai, aiError: null });
   } catch (e) {
     console.error(products ? 'Products AI failed:' : 'Receipt AI failed:', e.message);
@@ -927,6 +986,8 @@ Treat all of these the same way. Extract from the image:
 - total: the final amount paid (after discounts) as printed in the image, or null if no total is shown or it is unreadable. Do not add it up yourself.
 - discount: the sum of whole-receipt discounts and rounding NOT already in the line prices, as a positive number, or null if none.
 - date: purchase date as YYYY-MM-DD, or null if no date is shown. Do not guess.
+  Today is ${localDay()}, and a receipt is usually from the last few days. A short date ends with a two-digit year:
+  14/11/26 is 14 November 2026 (day first, as most countries print it), or month first on a US receipt. It is never year/month/day.
 - items: each purchased line item with its final price for the quantity bought (after line discounts).
   Include delivery and service fees as their own lines when they are shown. Keep item names in the image's language.
 - matches: for each item on the shopping list below that was bought on this receipt,
@@ -1213,11 +1274,14 @@ ${known.length ? known.join(', ') : '(none yet)'}`;
 
 app.post('/api/import', upload.single('photo'), wrap(async (req, res) => {
   if (!apiKey()) throw bad('not_configured');
-  const strong = req.body?.strong === '1' || req.body?.strong === true;
+  const mode = readMode(req.body);
   if (req.file) {
     const image = `data:${req.file.mimetype || 'image/jpeg'};base64,${req.file.buffer.toString('base64')}`;
-    return res.json({ ...(await extractList({ image, strong })), source: 'photo' });
+    const list = await readAuto(mode, (strong) => extractList({ image, strong }), req.body?.preview, 'a shopping list, note or recipe');
+    return res.json({ ...list, source: 'photo' });
   }
+  // Text and links are already clear: automatic mode reads them with the basic model
+  const strong = mode === 'strong';
   const input = String(req.body?.text || '').trim();
   if (!input) throw bad('nothing_found');
   // A shared link often arrives as "Recipe name https://…": short text with one link = the link
