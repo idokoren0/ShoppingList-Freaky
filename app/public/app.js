@@ -1058,6 +1058,13 @@ function openPurchase({ fromList = true, cartIds = [] } = {}) {
 // Stores used before, suggested under the store field; the last list is kept for offline use
 const storeKey = (s) => String(s || '').normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
 let knownStores = loadJSON('stores', []);
+// Names merged by hand in the stores sheet: spelling key -> the name to save
+let storeAliases = loadJSON('storeAliases', {});
+// The saved spelling of a store name, or nothing when the store is new
+function knownStoreName(name) {
+  const k = storeKey(name);
+  return storeAliases[k || String(name || '').trim()] || (k && knownStores.find((n) => storeKey(n) === k)) || '';
+}
 
 function fillStoreNames() {
   $('store-names').replaceChildren(...knownStores.map((name) => Object.assign(document.createElement('option'), { value: name })));
@@ -1066,8 +1073,9 @@ function fillStoreNames() {
 async function loadStores() {
   fillStoreNames();
   try {
-    knownStores = await api('/api/stores');
+    [knownStores, storeAliases] = await Promise.all([api('/api/stores'), api('/api/stores/aliases')]);
     saveJSON('stores', knownStores);
+    saveJSON('storeAliases', storeAliases);
     fillStoreNames();
   } catch { /* offline: the saved list is enough */ }
 }
@@ -1076,14 +1084,16 @@ async function loadStores() {
 // Not when editing, so a wrong spelling can be corrected.
 $('p-store').addEventListener('change', () => {
   if (state.draft?.editId) return;
-  const k = storeKey($('p-store').value);
-  const known = k && knownStores.find((n) => storeKey(n) === k);
+  const known = knownStoreName($('p-store').value);
   if (known) $('p-store').value = known;
 });
 
 function openEditPurchase(p) {
   if (!requireOnline()) return;
-  state.draft = { editId: p.id, origDay: todayStr(new Date(p.purchased_at)), checked: new Set(), aiMatched: new Map(), lines: [], allowZero: p.total === 0 };
+  state.draft = {
+    editId: p.id, origDay: todayStr(new Date(p.purchased_at)), checked: new Set(), aiMatched: new Map(), allowZero: p.total === 0,
+    lines: (p.lines || []).map((l) => ({ id: l.id, name: l.name, price: l.price })), linesDirty: false, editingLine: null,
+  };
   $('purchase-form').reset();
   setTotalRequired(p.total !== 0);
   $('purchase-title').textContent = t('editPurchase');
@@ -1094,8 +1104,10 @@ function openEditPurchase(p) {
   $('p-date').value = todayStr(new Date(p.purchased_at));
   $('receipt-box').hidden = true;
   $('p-items-field').hidden = true;
-  $('p-lines').hidden = true;
   $('p-monster-line').hidden = true;
+  $('p-lines').open = false;
+  $('p-line-add-name').value = '';
+  renderLines();
   loadStores();
   openModal($('purchase-modal'));
 }
@@ -1183,19 +1195,23 @@ function applyPhotoKind() {
 function renderLines() {
   const d = state.draft;
   const lines = d?.lines || [];
-  const products = Boolean(d && !d.editId) && (lines.length ? d.linesKind === 'products' : photoKind() === 'products');
-  $('p-lines').hidden = !lines.length && !products;
-  $('p-line-add').hidden = !products;
+  // Editing a saved purchase: its products can be corrected, removed and added to, each with its price
+  const editing = Boolean(d?.editId);
+  const products = Boolean(d && !editing) && (lines.length ? d.linesKind === 'products' : photoKind() === 'products');
+  $('p-lines').hidden = !lines.length && !products && !editing;
+  $('p-line-add').hidden = !products && !editing;
+  $('p-line-add-name').placeholder = t(editing ? 'addProduct' : 'addProductPlaceholder');
   if (products) $('p-lines').open = true;
-  if (!lines.length && !products) return;
-  $('p-lines-summary').textContent = products
-    ? (lines.length ? t('productsN', { n: lines.length }) : t('products'))
+  if (!lines.length && !products && !editing) return;
+  $('p-lines-summary').textContent = editing ? (lines.length ? t('purchaseProductsN', { n: lines.length }) : t('purchaseProducts'))
+    : products ? (lines.length ? t('productsN', { n: lines.length }) : t('products'))
     : t('receiptLines', { n: lines.length });
   $('p-lines-list').innerHTML = lines.map((l, idx) => {
     if (d.editingLine === idx) {
       return `<li class="line-edit">
         <input type="text" data-line-name aria-label="${t('productName')}" placeholder="${t('productName')}" value="${esc(l.name)}" enterkeyhint="done">
-        ${l.price == null ? `<input type="text" inputmode="numeric" data-line-qty aria-label="${t('quantity')}" value="${l.quantity || 1}" enterkeyhint="done">` : ''}
+        ${editing ? `<input type="text" inputmode="decimal" data-line-price aria-label="${t('price')}" placeholder="${t('price')}" value="${l.price ?? ''}" enterkeyhint="done">`
+          : l.price == null ? `<input type="text" inputmode="numeric" data-line-qty aria-label="${t('quantity')}" value="${l.quantity || 1}" enterkeyhint="done">` : ''}
         <button type="button" class="icon-btn" data-line-done aria-label="${t('finishEditing')}">${icon('check')}</button>
       </li>`;
     }
@@ -1208,7 +1224,9 @@ function renderLines() {
     </li>`;
   }).join('');
   if (d.editingLine != null) {
-    const input = $('p-lines-list').querySelector('[data-line-name]');
+    // A product just added while editing a purchase has its name: go to its price
+    const input = $('p-lines-list').querySelector(d.focusPrice ? '[data-line-price]' : '[data-line-name]');
+    d.focusPrice = false;
     input?.focus();
     input?.select();
   }
@@ -1239,8 +1257,15 @@ function commitLineEdit({ cancel = false } = {}) {
       const q = parseInt(qtyInput.value.replace(/[^\d]/g, ''), 10);
       line.quantity = Number.isFinite(q) && q > 0 ? Math.min(q, 99) : 1;
     }
+    const priceInput = row.querySelector('[data-line-price]');
+    if (priceInput) {
+      const v = priceInput.value.replace(/[^\d.,]/g, '').replace(',', '.');
+      const price = v === '' ? null : Number(v);
+      line.price = price !== null && Number.isFinite(price) && price >= 0 ? Math.round(price * 100) / 100 : null;
+    }
+    d.linesDirty = true;
     if (line.item_id && d.aiMatched.has(line.item_id)) d.aiMatched.get(line.item_id).line = line.name;
-    linkLineToList(line);
+    if (!d.editId) linkLineToList(line);
   }
   d.editingLine = null;
   renderLines();
@@ -1250,6 +1275,7 @@ function commitLineEdit({ cancel = false } = {}) {
 function removeLine(idx) {
   const d = state.draft;
   const [line] = d.lines.splice(idx, 1);
+  d.linesDirty = true;
   if (line?.item_id) {
     d.aiMatched.delete(line.item_id);
     d.checked.delete(line.item_id);
@@ -1267,11 +1293,13 @@ function addLine() {
   if (!d.lines.length) d.linesKind = 'products';
   const line = { name, price: null, quantity: 1, item_id: null };
   d.lines.push(line);
-  linkLineToList(line);
+  d.linesDirty = true;
+  if (d.editId) { d.editingLine = d.lines.length - 1; d.focusPrice = true; }
+  else linkLineToList(line);
   input.value = '';
   renderLines();
   renderPickItems();
-  input.focus();
+  if (!d.editId) input.focus();
 }
 
 $('p-lines-list').addEventListener('click', (e) => {
@@ -1463,7 +1491,7 @@ function applyAiResult(ai, tryStrong = '') {
   }
   d.linesKind = 'receipt';
   if (ai.total != null) $('p-total').value = ai.total.toFixed(2);
-  if (ai.store) $('p-store').value = knownStores.find((n) => storeKey(n) === storeKey(ai.store)) || ai.store;
+  if (ai.store) $('p-store').value = knownStoreName(ai.store) || ai.store;
   if (plausibleDate(ai.date)) $('p-date').value = ai.date;
   const byLine = new Map(ai.matches.map((m) => [m.line_index, m.item_id]));
   d.lines = ai.items.map((it, idx) => ({ name: it.name, price: it.price, item_id: byLine.get(idx) || null }));
@@ -1513,7 +1541,8 @@ $('purchase-form').addEventListener('submit', async (e) => {
   if (d.editId) {
     $('p-save').disabled = true;
     try {
-      await api(`/api/purchases/${d.editId}`, { method: 'PATCH', json: fields });
+      const lines = d.linesDirty ? d.lines.map((l) => ({ id: l.id, name: l.name, price: l.price ?? null })) : undefined;
+      await api(`/api/purchases/${d.editId}`, { method: 'PATCH', json: { ...fields, lines } });
       closeModal($('purchase-modal'));
       toast(t('purchaseUpdated'));
       loadPurchases();
@@ -2272,6 +2301,70 @@ async function loadPurchases() {
   renderPurchases();
 }
 
+// ---------- Stores: merge different spellings of one store by hand ----------
+async function openStores() {
+  if (!requireOnline()) return;
+  try {
+    const { stores } = await api('/api/stores/manage');
+    state.storesSheet = stores;
+  } catch (err) {
+    return toast(err.message);
+  }
+  $('stores-name').value = '';
+  renderStores();
+  openModal($('stores-modal'));
+}
+
+function renderStores() {
+  const stores = state.storesSheet || [];
+  $('stores-list').innerHTML = stores.map((s, idx) => `<li><label>
+    <input type="checkbox" class="tick" value="${idx}">
+    <span class="pick-text"><span>${esc(s.name)}</span><span class="match-line">${t('nPurchases', { n: s.count })}</span></span>
+  </label></li>`).join('');
+  $('stores-empty').hidden = stores.length > 0;
+  $('stores-name-field').hidden = !stores.length;
+  updateStoresForm();
+}
+
+const pickedStores = () => [...$('stores-list').querySelectorAll('input:checked')].map((c) => state.storesSheet[Number(c.value)]);
+
+function updateStoresForm() {
+  const picked = pickedStores();
+  const name = $('stores-name').value.trim();
+  // One store ticked is a rename; two or more is a merge
+  const changes = picked.some((s) => s.name !== name);
+  $('stores-save').disabled = !picked.length || !name || !changes;
+  $('stores-save').textContent = picked.length > 1 ? t('storesMergeN', { n: picked.length }) : t('storesRename');
+}
+
+$('stores-list').addEventListener('change', () => {
+  const picked = pickedStores();
+  // The name starts as the first store ticked, and stays unless that store is unticked. A typed name is kept.
+  const names = (state.storesSheet || []).map((s) => s.name);
+  const cur = $('stores-name').value.trim();
+  if (!cur || (names.includes(cur) && !picked.some((s) => s.name === cur))) $('stores-name').value = picked[0]?.name || '';
+  updateStoresForm();
+});
+$('stores-name').addEventListener('input', updateStoresForm);
+$('stores-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const picked = pickedStores();
+  const name = $('stores-name').value.trim();
+  if (!picked.length || !name) return;
+  $('stores-save').disabled = true;
+  try {
+    await api('/api/stores/merge', { json: { names: picked.map((s) => s.name), name } });
+    closeModal($('stores-modal'));
+    toast(t(picked.length > 1 ? 'storesMerged' : 'storesRenamed', { name }));
+    loadStores();
+    loadPurchases();
+  } catch (err) {
+    toast(err.message);
+    updateStoresForm();
+  }
+});
+$('open-stores').addEventListener('click', openStores);
+
 let searchTimer;
 $('search').addEventListener('input', () => {
   clearTimeout(searchTimer);
@@ -2521,18 +2614,21 @@ function renderTrend(trend) {
     <div class="legend">${people.map((p) => `<span><i style="background:${personColor(p.id)}"></i>${esc(p.name)}</span>`).join('')}</div>
     <div class="trend" role="img" aria-label="${t('sixMonthSpending')}">
       ${trend.map((m) => {
-        // The month total sits right on top of the tallest bar: over the bar itself when only
-        // one person spent that month, centred over the pair when both did.
+        // Each person's amount sits right on top of the bars: over the bar itself when only one
+        // person spent that month; when both did, one line each, marked with the person's colour.
         const spent = m.people.filter((p) => p.total > 0);
         const top = Math.max(0, ...m.people.map((p) => p.total)) / max * 100;
-        const sum = total(m) ? `<span class="trend-sum num">${numFmt.format(Math.round(total(m)))}</span>` : '';
+        const amount = (p) => numFmt.format(Math.round(p.total));
+        const sum = spent.length === 1 ? `<span class="trend-sum num">${amount(spent[0])}</span>` : '';
+        const pair = spent.length > 1 ? `<span class="trend-sum pair num" style="bottom:${top}%">${
+          spent.map((p) => `<span><i style="background:${personColor(p.id)}"></i>${amount(p)}</span>`).join('')}</span>` : '';
         return `
         <div class="trend-col">
           <div class="trend-bars">
             ${m.people.map((p) => `<div class="trend-bar" style="height:${(p.total / max) * 100}%;background:${personColor(p.id)}"
               title="${esc(people.find((x) => x.id === p.id)?.name)} · ${label(m.month)}: ${money.format(p.total)}">${
                 spent.length === 1 && spent[0] === p ? sum : ''}</div>`).join('')}
-            ${spent.length > 1 ? sum.replace('class="trend-sum', `style="bottom:${top}%" class="trend-sum pair`) : ''}
+            ${pair}
           </div>
           <div class="trend-label">${label(m.month)}</div>
         </div>`;

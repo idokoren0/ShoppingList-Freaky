@@ -323,6 +323,9 @@ db.exec(`
   CREATE UNIQUE INDEX IF NOT EXISTS purchases_client_uid ON purchases(client_uid) WHERE client_uid IS NOT NULL;
 `);
 
+// Store names merged by hand: a spelling's key -> the name it is saved as
+db.exec('CREATE TABLE IF NOT EXISTS store_aliases (key TEXT PRIMARY KEY, name TEXT NOT NULL)');
+
 const now = () => new Date().toISOString();
 
 if (!db.prepare('SELECT 1 FROM lists LIMIT 1').get()) {
@@ -1393,7 +1396,7 @@ app.delete('/api/saved/:id', wrap((req, res) => {
 // Purchases
 const purchaseDetails = (purchases) => {
   const itemsStmt = db.prepare('SELECT id, name, quantity FROM items WHERE purchase_id = ? AND deleted_at IS NULL ORDER BY id');
-  const linesStmt = db.prepare('SELECT name, price FROM receipt_lines WHERE purchase_id = ? ORDER BY id');
+  const linesStmt = db.prepare('SELECT id, name, price FROM receipt_lines WHERE purchase_id = ? ORDER BY id');
   for (const pu of purchases) {
     pu.items = itemsStmt.all(pu.id);
     pu.lines = linesStmt.all(pu.id);
@@ -1437,15 +1440,53 @@ function knownStores() {
   return rows.filter((r) => { const k = storeKey(r.name) || r.name; return !seen.has(k) && seen.add(k); }).map((r) => r.name);
 }
 
-// A typed or read store name, spelled the way that store was saved before
+// A typed or read store name, spelled the way that store was saved before.
+// Names merged by hand (a store's name in another language, say) win over the spelling match.
 function canonicalStore(name) {
   const s = String(name || '').trim();
   if (!s) return null;
   const k = storeKey(s);
+  const merged = db.prepare('SELECT name FROM store_aliases WHERE key = ?').get(k || s);
+  if (merged) return merged.name;
   return (k && knownStores().find((n) => storeKey(n) === k)) || s;
 }
+const storeAliases = () => Object.fromEntries(db.prepare('SELECT key, name FROM store_aliases').all().map((r) => [r.key, r.name]));
 
 app.get('/api/stores', wrap((req, res) => res.json(knownStores())));
+app.get('/api/stores/aliases', wrap((req, res) => res.json(storeAliases())));
+
+// The stores sheet: every spelling in the history with how many purchases it has
+app.get('/api/stores/manage', wrap((req, res) => {
+  const stores = db.prepare(`
+    SELECT TRIM(store) AS name, COUNT(*) AS count FROM purchases
+    WHERE deleted_at IS NULL AND store IS NOT NULL AND TRIM(store) != ''
+    GROUP BY TRIM(store) ORDER BY count DESC, MAX(purchased_at) DESC
+  `).all();
+  res.json({ stores, aliases: storeAliases() });
+}));
+
+// Merge store names by hand: every purchase under one of `names` is renamed to `name`,
+// and those spellings are remembered, so later receipts are saved under `name` too
+app.post('/api/stores/merge', wrap((req, res) => {
+  const name = String(req.body?.name || '').trim().replace(/\s+/g, ' ').slice(0, 80);
+  const names = (Array.isArray(req.body?.names) ? req.body.names : []).map((n) => String(n || '').trim()).filter(Boolean).slice(0, 100);
+  if (!name || !names.length) throw bad('Invalid stores');
+  const keyOf = (n) => storeKey(n) || String(n).trim();
+  const keys = new Set([...names, name].map(keyOf));
+  let changed = 0;
+  tx(() => {
+    const rename = db.prepare('UPDATE purchases SET store = ? WHERE store = ?');
+    for (const r of db.prepare('SELECT DISTINCT store FROM purchases WHERE store IS NOT NULL').all()) {
+      if (r.store !== name && keys.has(keyOf(r.store))) changed += Number(rename.run(name, r.store).changes);
+    }
+    const put = db.prepare('INSERT INTO store_aliases (key, name) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET name = excluded.name');
+    // Spellings merged earlier into one of these names follow along
+    for (const a of db.prepare('SELECT key, name FROM store_aliases').all()) if (keys.has(keyOf(a.name))) put.run(a.key, name);
+    for (const k of keys) put.run(k, name);
+  });
+  broadcast('purchases');
+  res.json({ ok: true, changed });
+}));
 
 // matchStore: new purchases take the known spelling; an edit keeps exactly what was typed, so a spelling can be corrected
 function purchaseFields(b, { matchStore = true } = {}) {
@@ -1605,8 +1646,27 @@ app.patch('/api/purchases/:id', wrap((req, res) => {
   const cur = db.prepare('SELECT * FROM purchases WHERE id = ? AND deleted_at IS NULL').get(id);
   if (!cur) throw bad('Purchase not found');
   const f = purchaseFields({ ...cur, ...req.body }, { matchStore: false });
-  db.prepare('UPDATE purchases SET buyer_id = ?, total = ?, store = ?, note = ?, category = ?, purchased_at = ? WHERE id = ?')
-    .run(f.buyerId, f.total, f.store, f.note, f.category, f.purchasedAt || cur.purchased_at, id);
+  // lines (optional): the purchase's products after editing. A line with an id is kept and updated,
+  // one without is new, and a saved line that is missing was removed.
+  const lines = Array.isArray(req.body?.lines) ? req.body.lines.slice(0, 300) : null;
+  tx(() => {
+    db.prepare('UPDATE purchases SET buyer_id = ?, total = ?, store = ?, note = ?, category = ?, purchased_at = ? WHERE id = ?')
+      .run(f.buyerId, f.total, f.store, f.note, f.category, f.purchasedAt || cur.purchased_at, id);
+    if (!lines) return;
+    const saved = new Set(db.prepare('SELECT id FROM receipt_lines WHERE purchase_id = ?').all(id).map((r) => r.id));
+    const update = db.prepare('UPDATE receipt_lines SET name = ?, price = ? WHERE id = ?');
+    const add = db.prepare('INSERT INTO receipt_lines (purchase_id, name, price, item_key) VALUES (?, ?, ?, NULL)');
+    for (const l of lines) {
+      const lineName = String(l?.name || '').trim().slice(0, 200);
+      if (!lineName) continue;
+      const price = l.price !== null && l.price !== '' && Number.isFinite(Number(l.price)) ? Number(l.price) : null;
+      const lineId = Number(l.id);
+      if (saved.delete(lineId)) update.run(lineName, price, lineId);
+      else add.run(id, lineName, price);
+    }
+    const remove = db.prepare('DELETE FROM receipt_lines WHERE id = ?');
+    for (const lineId of saved) remove.run(lineId);
+  });
   broadcast('purchases');
   res.json({ ok: true });
 }));

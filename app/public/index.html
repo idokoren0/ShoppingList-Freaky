@@ -158,7 +158,10 @@
     <section id="view-history" class="view" aria-labelledby="history-title">
       <div class="view-head">
         <h2 id="history-title" class="view-title" data-i18n="tabPurchases">Purchases</h2>
-        <button id="new-purchase" class="btn" type="button"><svg class="icon"><use href="#i-plus"/></svg><span data-i18n="newPurchase">New purchase</span></button>
+        <div class="view-tools">
+          <button id="open-stores" class="btn" type="button" data-i18n="stores">Stores</button>
+          <button id="new-purchase" class="btn" type="button"><svg class="icon"><use href="#i-plus"/></svg><span data-i18n="newPurchase">New purchase</span></button>
+        </div>
       </div>
       <label class="search">
         <svg class="icon"><use href="#i-search"/></svg>
@@ -402,6 +405,27 @@
         <button type="button" id="l-delete" class="btn" data-i18n="deleteList">Delete list</button>
         <button type="button" class="btn" data-close data-i18n="cancel">Cancel</button>
         <button type="submit" class="btn primary" data-i18n="save">Save</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Stores: merge different spellings of one store -->
+  <div id="stores-modal" class="modal" hidden>
+    <form id="stores-form" class="sheet" autocomplete="off" role="dialog" aria-modal="true" aria-labelledby="stores-title">
+      <div class="sheet-head">
+        <h2 id="stores-title" data-i18n="stores">Stores</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Close" data-i18n-aria-label="close"><svg class="icon"><use href="#i-x"/></svg></button>
+      </div>
+      <p class="hint" data-i18n="storesHint">Was one store saved under several names? Tick them and pick one name. Their purchases move to that name, and new receipts are saved under it too.</p>
+      <ul id="stores-list" class="pick-items"></ul>
+      <p id="stores-empty" class="hint" hidden data-i18n="storesEmpty">No stores in your purchases yet.</p>
+      <label id="stores-name-field" class="field">
+        <span data-i18n="storesName">Name to keep</span>
+        <input id="stores-name" type="text" maxlength="80" placeholder="Tick a store above" data-i18n-placeholder="storesNamePlaceholder">
+      </label>
+      <div class="sheet-actions">
+        <button type="button" class="btn" data-close data-i18n="cancel">Cancel</button>
+        <button id="stores-save" type="submit" class="btn primary" disabled data-i18n="storesRename">Rename</button>
       </div>
     </form>
   </div>
